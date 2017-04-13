@@ -1,7 +1,7 @@
 (**)
 
 theory Scratch
-  imports Main IICF
+  imports "$AFP/RefineImperative_HOL/IICF/IICF"
 begin
   
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
@@ -55,8 +55,8 @@ begin
         if j=length s then RETURN (j,True) else RETURN (j,False)
       }) (j,found);
       if \<not>found then do {
-        let i = i + (j - (border s j - 1));
-        let j = max 0 (border s j - 1);
+        let i = i + (j + 1 - border s j);
+        let j = max 0 (border s j - 1); (*max not necessary*)
         RETURN (i,j,False)
       } else RETURN (i,j,True)
     }) (i,j,False);
