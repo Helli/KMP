@@ -1,6 +1,6 @@
 (**)
 
-theory Scratch
+theory KMP
   imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
 begin
   
