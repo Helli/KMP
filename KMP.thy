@@ -9,12 +9,12 @@ begin
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' t s i \<equiv> take (length s) (drop i t) = s"  
   
-  text\<open>Probem:\<close>
+  text\<open>Problem:\<close>
   value "is_substring_at' [5] [] 5"
   value "is_substring_at' [5] [5] 5"
   value "is_substring_at' [] [] 3"
   
-  text\<open>Alternatively:\<close>
+  text\<open>For the moment, we use this instead:\<close>
   fun is_substring_at where
     "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
     "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
@@ -31,41 +31,6 @@ section\<open>Definition "substring"\<close>
     by (induction t s i rule: is_substring_at.induct) auto
       
   (*Todo: third alternative: inductive is_substring_at*)
-  
-  term "\<lambda>t s. SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>j. is_substring_at t s j \<longrightarrow> i\<le>j))"
-  
-  
-  term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
-  
-  definition "test \<equiv> do {
-    x \<leftarrow> SPEC (\<lambda>x::nat. x<5);
-    y \<leftarrow> SPEC (\<lambda>y. y<10);
-    RETURN (x+y)
-  }"  
-  
-  lemma "test \<le> SPEC (\<lambda>x. x<14)"
-    unfolding test_def
-    apply refine_vcg by auto  
-  
-  definition "i_test2 x\<^sub>0 \<equiv> \<lambda>(x,s). x\<ge>0 \<and> x\<^sub>0*5 = x*5+s"
-  
-  definition "test2 x\<^sub>0 \<equiv> do {
-    (_,s) \<leftarrow> WHILEIT (i_test2 x\<^sub>0) (\<lambda>(x,s). x>0) (\<lambda>(x,s). do {
-      let s = s + 5;
-      let x = x - 1;
-      RETURN (x,s)
-    }) (x\<^sub>0::int,0::int);
-    RETURN s
-  }"  
-  
-  term "measure (nat o fst)"
-    
-  lemma "x\<ge>0 \<Longrightarrow> test2 x \<le> SPEC (\<lambda>r. r=x*5)"
-    unfolding test2_def i_test2_def
-    apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
-    apply auto  
-    done
-      
 
 section\<open>Naive algorithm\<close>
     
@@ -111,7 +76,7 @@ lemma empty_substring: "i \<le> length t
          \<Longrightarrow> is_substring_at t [] i"
   apply (induction t arbitrary: i)
   apply auto
-    using is_substring_at.elims(3) by force
+  using is_substring_at.elims(3) by force
 
 lemma all_positions_substring:
   "\<lbrakk>length s \<le> length t;
@@ -183,7 +148,42 @@ subsection\<open>Algorithm\<close>
   lemma "kmp t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding kmp_def
     apply refine_vcg  
-    apply vc_solve  
+    apply vc_solve
+    oops
+      
+section\<open>Notes and Tests\<close>
+
+  term "\<lambda>t s. SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>j. is_substring_at t s j \<longrightarrow> i\<le>j))"
   
   
+  term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
   
+  definition "test \<equiv> do {
+    x \<leftarrow> SPEC (\<lambda>x::nat. x<5);
+    y \<leftarrow> SPEC (\<lambda>y. y<10);
+    RETURN (x+y)
+  }"  
+  
+  lemma "test \<le> SPEC (\<lambda>x. x<14)"
+    unfolding test_def
+    apply refine_vcg by auto  
+  
+  definition "i_test2 x\<^sub>0 \<equiv> \<lambda>(x,s). x\<ge>0 \<and> x\<^sub>0*5 = x*5+s"
+  
+  definition "test2 x\<^sub>0 \<equiv> do {
+    (_,s) \<leftarrow> WHILEIT (i_test2 x\<^sub>0) (\<lambda>(x,s). x>0) (\<lambda>(x,s). do {
+      let s = s + 5;
+      let x = x - 1;
+      RETURN (x,s)
+    }) (x\<^sub>0::int,0::int);
+    RETURN s
+  }"  
+  
+  term "measure (nat o fst)"
+    
+  lemma "x\<ge>0 \<Longrightarrow> test2 x \<le> SPEC (\<lambda>r. r=x*5)"
+    unfolding test2_def i_test2_def
+    apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
+    apply auto  
+    done
+    
