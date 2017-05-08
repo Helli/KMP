@@ -37,7 +37,7 @@ section\<open>Naive algorithm\<close>
 subsection\<open>Invariants\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j(*_?*),found).
     \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at t s i')
-    \<or> found \<and> is_substring_at t s i"  
+    \<or> found \<and> is_substring_at t s i"
   definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
     \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
     \<or> found \<and> j = length s \<and> is_substring_at t s iout"
@@ -61,11 +61,6 @@ subsection\<open>Algorithm\<close>
     RETURN found
   }"
 
-lemma all_positions_step:
-  "\<lbrakk>\<forall>j'<aba. t ! (ab + j') = s ! j'; t ! (ab + aba) = s ! aba\<rbrakk>
-       \<Longrightarrow> \<forall>j'\<le>aba. t ! (ab + j') = s ! j'"
-  using le_neq_implies_less by blast
-  
 lemma substring_step:
   "\<lbrakk>length s + i < length t; is_substring_at t s i; t ! (i + length s) = x\<rbrakk> \<Longrightarrow> is_substring_at t (s@[x]) i"
   apply (induction t s i rule: is_substring_at.induct)
@@ -79,8 +74,7 @@ lemma empty_substring: "i \<le> length t
   using is_substring_at.elims(3) by force
 
 lemma all_positions_substring:
-  "\<lbrakk>length s \<le> length t;
-    i \<le> length t - length s;
+  "\<lbrakk>length s \<le> length t; i \<le> length t - length s;
     \<forall>j'<length s. t ! (i + j') = s ! j'\<rbrakk>
        \<Longrightarrow> is_substring_at t s i"
   proof (induction s arbitrary: t i rule: rev_induct)
@@ -88,7 +82,7 @@ lemma all_positions_substring:
     then show ?case by (simp add: empty_substring)
   next
     case (snoc x xs)
-    moreover from `length (xs @ [x]) \<le> length t` have "length xs \<le> length t" by simp
+    from `length (xs @ [x]) \<le> length t` have "length xs \<le> length t" by simp
     moreover have "i \<le> length t - length xs"
       using snoc.prems(2) by auto
     moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
@@ -101,14 +95,34 @@ lemma all_positions_substring:
       apply (fact f)
       by (simp add: snoc.prems(3))
   qed
+    
+lemma substring_all_positions:
+  "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
+  by (induction t s i rule: is_substring_at.induct)
+    (auto simp: nth_Cons')
+    
+lemma substring_smaller: "is_substring_at t s i \<Longrightarrow> length s \<le> length t"
+  by (induction t s i rule: is_substring_at.induct) simp_all
+(*Todo: Use this to remove precondition?*)
+    
+lemma equal_length_0: "\<lbrakk>length t = length s; is_substring_at t s i\<rbrakk>
+    \<Longrightarrow> i = 0"
+  apply (induction t s i rule: is_substring_at.induct)
+    using substring_smaller by fastforce+
+
+lemma i_bounded: "is_substring_at t s i \<Longrightarrow> i \<le> length t - length s"
+  apply (induction t s i rule: is_substring_at.induct)
+  apply (auto simp add: Suc_diff_le substring_smaller)
+  done
 
 lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
   \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
     (*are these safe?*)apply refine_vcg apply vc_solve
     apply (metis all_positions_substring less_SucE)
-    using less_antisym apply blast
-    oops
+    using less_Suc_eq apply blast
+    apply (metis less_SucE substring_all_positions)
+    by (meson i_bounded leI le_less_trans)
 
 (*ToDo: WHILET statt WHILE*)
 text\<open>Zusätzliche Voraussetzungen nötig! Auch Seidl sagen?\<close>
