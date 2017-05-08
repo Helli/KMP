@@ -5,9 +5,33 @@ theory KMP
 begin
   
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
-    
-  definition "is_substring_at t s i \<equiv> take (length s) (drop i t) = s"  
-    
+  
+section\<open>Definition "substring"\<close>
+  definition "is_substring_at' t s i \<equiv> take (length s) (drop i t) = s"  
+  
+  text\<open>Probem:\<close>
+  value "is_substring_at' [5] [] 5"
+  value "is_substring_at' [5] [5] 5"
+  value "is_substring_at' [] [] 3"
+  
+  text\<open>Alternatively:\<close>
+  fun is_substring_at where
+    "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
+    "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
+    "is_substring_at t [] 0 \<longleftrightarrow> True" |
+    "is_substring_at [] _ _ \<longleftrightarrow> False"
+  
+  value "is_substring_at [5] [] 5"
+  value "is_substring_at [5] [5] 5"
+  value "is_substring_at [] [] 3"
+  text\<open>Better, I suppose?\<close>
+        
+  lemma "i \<le> length t \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> is_substring_at' t s i"
+    unfolding is_substring_at'_def
+    by (induction t s i rule: is_substring_at.induct) auto
+      
+  (*Todo: third alternative: inductive is_substring_at*)
+  
   term "\<lambda>t s. SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>j. is_substring_at t s j \<longrightarrow> i\<le>j))"
   
   
@@ -76,23 +100,49 @@ lemma all_positions_step:
   "\<lbrakk>\<forall>j'<aba. t ! (ab + j') = s ! j'; t ! (ab + aba) = s ! aba\<rbrakk>
        \<Longrightarrow> \<forall>j'\<le>aba. t ! (ab + j') = s ! j'"
   using le_neq_implies_less by blast
+  
+lemma substring_step:
+  "\<lbrakk>length s + i < length t; is_substring_at t s i; t ! (i + length s) = x\<rbrakk> \<Longrightarrow> is_substring_at t (s@[x]) i"
+  apply (induction t s i rule: is_substring_at.induct)
+  apply auto
+  using is_substring_at.elims(3) by fastforce
+
+lemma empty_substring: "i \<le> length t
+         \<Longrightarrow> is_substring_at t [] i"
+  apply (induction t arbitrary: i)
+  apply auto
+    using is_substring_at.elims(3) by force
 
 lemma all_positions_substring:
-"\<lbrakk>(*Todo: Copy from subgoal*)True\<rbrakk>
-       \<Longrightarrow> is_substring_at t s ab"
-  unfolding is_substring_at_def
-  oops
-      
+  "\<lbrakk>length s \<le> length t;
+    i \<le> length t - length s;
+    \<forall>j'<length s. t ! (i + j') = s ! j'\<rbrakk>
+       \<Longrightarrow> is_substring_at t s i"
+  proof (induction s arbitrary: t i rule: rev_induct)
+    case Nil
+    then show ?case by (simp add: empty_substring)
+  next
+    case (snoc x xs)
+    moreover from `length (xs @ [x]) \<le> length t` have "length xs \<le> length t" by simp
+    moreover have "i \<le> length t - length xs"
+      using snoc.prems(2) by auto
+    moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
+      by (metis le_refl length_append less_le_trans nth_append snoc.prems(3) trans_le_add1)
+    ultimately have f: "is_substring_at t xs i"
+      using snoc.IH by blast
+    show ?case
+      apply (rule substring_step)
+      using snoc.prems(1) snoc.prems(2) apply auto[1]
+      apply (fact f)
+      by (simp add: snoc.prems(3))
+  qed
+
 lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
   \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
     (*are these safe?*)apply refine_vcg apply vc_solve
-    using is_substring_at_def
-    (*...*)
-    defer
+    apply (metis all_positions_substring less_SucE)
     using less_antisym apply blast
-      apply (smt add_le_imp_le_left is_substring_at_def leD le_trans less_Suc_eq nat_le_linear nth_drop nth_take order_trans ordered_cancel_comm_monoid_diff_class.le_diff_conv2)
-    using is_substring_at_def
     oops
 
 (*ToDo: WHILET statt WHILE*)
