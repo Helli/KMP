@@ -95,20 +95,14 @@ lemma all_positions_substring:
       apply (fact f)
       by (simp add: snoc.prems(3))
   qed
-    
+
 lemma substring_all_positions:
   "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
   by (induction t s i rule: is_substring_at.induct)
     (auto simp: nth_Cons')
-    
+
 lemma substring_smaller: "is_substring_at t s i \<Longrightarrow> length s \<le> length t"
   by (induction t s i rule: is_substring_at.induct) simp_all
-(*Todo: Use this to remove precondition?*)
-    
-lemma equal_length_0: "\<lbrakk>length t = length s; is_substring_at t s i\<rbrakk>
-    \<Longrightarrow> i = 0"
-  apply (induction t s i rule: is_substring_at.induct)
-    using substring_smaller by fastforce+
 
 lemma i_bounded: "is_substring_at t s i \<Longrightarrow> i \<le> length t - length s"
   apply (induction t s i rule: is_substring_at.induct)
@@ -124,8 +118,9 @@ lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
     apply (metis less_SucE substring_all_positions)
     by (meson i_bounded leI le_less_trans)
 
+text\<open>These preconditions cannot be removed:
+  If "s = []" or "t = []", the inner while-condition will access out-of-bound memory. The same can happen if "length t < length s" (I guess it could be narrowed down to something like 't not a prefix of s', but that's a bit pointless).\<close>
 (*ToDo: WHILET statt WHILE*)
-text\<open>Zusätzliche Voraussetzungen nötig! Auch Seidl sagen?\<close>
       
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
@@ -156,8 +151,13 @@ subsection\<open>Algorithm\<close>
 
     RETURN found
   }"
-      
-    
+        
+  lemma substring_substring:
+    "\<lbrakk>is_substring_at t s1 i; is_substring_at t s2 (i + length s1)\<rbrakk> \<Longrightarrow> is_substring_at t (s1@s2) i"
+    apply (induction t s1 i rule: is_substring_at.induct)
+    apply auto
+    done
+
     
   lemma "kmp t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding kmp_def
