@@ -48,9 +48,10 @@ section\<open>Naive algorithm\<close>
 subsection\<open>Invariants\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j(*_?*),found).
     \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at t s i')
-    \<or> found \<and> is_substring_at t s i (*second part needed?*)"  
+    \<or> found \<and> is_substring_at t s i"  
   definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
-    j \<le> length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))"  
+    \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
+    \<or> found \<and> j = length s \<and> is_substring_at t s iout"
 
 subsection\<open>Algorithm\<close>
   definition "na t s \<equiv> do {
@@ -70,22 +71,39 @@ subsection\<open>Algorithm\<close>
 
     RETURN found
   }"
+
+lemma all_positions_step:
+  "\<lbrakk>\<forall>j'<aba. t ! (ab + j') = s ! j'; t ! (ab + aba) = s ! aba\<rbrakk>
+       \<Longrightarrow> \<forall>j'\<le>aba. t ! (ab + j') = s ! j'"
+  using le_neq_implies_less by blast
+
+lemma all_positions_substring:
+"\<lbrakk>(*Todo: Copy from subgoal*)True\<rbrakk>
+       \<Longrightarrow> is_substring_at t s ab"
+  unfolding is_substring_at_def
+  oops
       
-  lemma "na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
+lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
+  \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
-    apply refine_vcg
-    apply vc_solve
+    (*are these safe?*)apply refine_vcg apply vc_solve
+    using is_substring_at_def
+    (*...*)
+    defer
     using less_antisym apply blast
-    nitpick
-    
+      apply (smt add_le_imp_le_left is_substring_at_def leD le_trans less_Suc_eq nat_le_linear nth_drop nth_take order_trans ordered_cancel_comm_monoid_diff_class.le_diff_conv2)
+    using is_substring_at_def
     oops
 
-
+(*ToDo: WHILET statt WHILE*)
+text\<open>Zusätzliche Voraussetzungen nötig! Auch Seidl sagen?\<close>
+      
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
   definition border :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where "border s j \<equiv> undefined"
   
   (*Todo: Properties*)
+  thm longest_common_prefix
 
 subsection\<open>Invariants\<close>
   definition "I_outer \<equiv> \<lambda>(i,j,found). undefined"  
