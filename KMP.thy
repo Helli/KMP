@@ -40,54 +40,22 @@ section\<open>Definition "substring"\<close>
     apply (induction t s i rule: is_substring_at.induct)
     apply (auto simp add: Suc_diff_le substring_length_s)
     done
-
-  (*Todo: third alternative: inductive is_substring_at*)
-
-section\<open>Naive algorithm\<close>
-    
-subsection\<open>Invariants\<close>
-  definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
-    \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at t s i')
-    \<or> found \<and> is_substring_at t s i"
-  definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
-    \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
-    \<or> found \<and> j = length s \<and> is_substring_at t s iout"
-
-subsection\<open>Algorithm\<close>
-  definition "na t s \<equiv> do {
-    let i=0;
-    let j=0;
-    let found=False;
-    (_,_,found) \<leftarrow> WHILEI (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
-      (j,found) \<leftarrow> WHILEI (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
-        let j=j+1;
-        if j=length s then RETURN (j,True) else RETURN (j,False)
-      }) (j,found);
-      if \<not>found then do {
-        let i = i + 1;
-        let j = 0;
-        RETURN (i,j,False)
-      } else RETURN (i,j,True)
-    }) (i,j,found);
-
-    RETURN found
-  }"
-
-lemma substring_step:
-  "\<lbrakk>length s + i < length t; is_substring_at t s i; t ! (i + length s) = x\<rbrakk> \<Longrightarrow> is_substring_at t (s@[x]) i"
-  apply (induction t s i rule: is_substring_at.induct)
-  apply auto
-  using is_substring_at.elims(3) by fastforce
-
-lemma empty_is_substring: "i \<le> length t \<Longrightarrow> is_substring_at t [] i"
-  apply (induction t arbitrary: i)
-  apply auto
-  using is_substring_at.elims(3) by force
-
-lemma all_positions_substring:
-  "\<lbrakk>length s \<le> length t; i \<le> length t - length s;
-    \<forall>j'<length s. t ! (i + j') = s ! j'\<rbrakk>
-       \<Longrightarrow> is_substring_at t s i"
+  
+  text\<open>Furthermore, we need:\<close>
+  
+  lemma substring_step:
+    "\<lbrakk>length s + i < length t; is_substring_at t s i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at t (s@[x]) i"
+    apply (induction t s i rule: is_substring_at.induct)
+    apply auto
+    using is_substring_at.elims(3) by fastforce
+  
+  lemma empty_is_substring: "i \<le> length t \<Longrightarrow> is_substring_at t [] i"
+    apply (induction t arbitrary: i)
+    apply auto
+    using is_substring_at.elims(3) by force
+  
+  lemma all_positions_substring:
+  "\<lbrakk>length s \<le> length t; i \<le> length t - length s; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at t s i"
   proof (induction s rule: rev_induct)
     case Nil
     then show ?case by (simp add: empty_is_substring)
@@ -106,26 +74,55 @@ lemma all_positions_substring:
       apply (fact f)
       by (simp add: snoc.prems(3))
   qed
+  
+  lemma substring_all_positions:
+    "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
+    by (induction t s i rule: is_substring_at.induct)
+      (auto simp: nth_Cons')
 
-lemma substring_all_positions:
-  "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
-  by (induction t s i rule: is_substring_at.induct)
-    (auto simp: nth_Cons')
+  (*Todo: third alternative: inductive is_substring_at*)
 
-lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
-  \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
+section\<open>Naive algorithm\<close>
+subsection\<open>Basic form\<close>
+  definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
+    \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at t s i')
+    \<or> found \<and> is_substring_at t s i"
+  definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
+    \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
+    \<or> found \<and> j = length s \<and> is_substring_at t s iout"
+  
+  definition "na t s \<equiv> do {
+    let i=0;
+    let j=0;
+    let found=False;
+    (_,_,found) \<leftarrow> WHILEI (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
+      (j,found) \<leftarrow> WHILEI (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
+        let j=j+1;
+        if j=length s then RETURN (j,True) else RETURN (j,False)
+      }) (j,found);
+      if \<not>found then do {
+        let i = i + 1;
+        let j = 0;
+        RETURN (i,j,False)
+      } else RETURN (i,j,True)
+    }) (i,j,found);
+
+    RETURN found
+  }"
+  
+  lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
+    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
     apply refine_vcg apply vc_solve
     apply (metis all_positions_substring less_SucE)
     using less_Suc_eq apply blast
     apply (metis less_SucE substring_all_positions)
     by (meson leI le_less_trans substring_i)
-    
-text\<open>These preconditions cannot be removed:
-  If @{term \<open>s = []\<close>} or  @{term \<open>t = []\<close>}, the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
+  
+  text\<open>These preconditions cannot be removed: If @{term \<open>s = []\<close>} or  @{term \<open>t = []\<close>}, the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
   (*ToDo: WHILET statt WHILE*)
   
-subsection\<open>Invariants\<close>
+subsection\<open>A variant returning the position\<close>
   definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
     (\<forall>i' < i. \<not>is_substring_at t s i') \<and>
     (case pos of None \<Rightarrow> j = 0
@@ -209,9 +206,6 @@ subsection\<open>Algorithm\<close>
 section\<open>Notes and Tests\<close>
 
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
-  
-  term "\<lambda>t s. SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>j. is_substring_at t s j \<longrightarrow> i\<le>j))"
-  
   
   term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
   
