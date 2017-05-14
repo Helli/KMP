@@ -14,7 +14,7 @@ section\<open>Definition "substring"\<close>
   text\<open>Not very intuitive...\<close>
   
   text\<open>For the moment, we use this instead:\<close>
-  fun is_substring_at where
+  fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
     "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
     "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
     "is_substring_at t [] 0 \<longleftrightarrow> True" |
@@ -123,8 +123,45 @@ lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
     
 text\<open>These preconditions cannot be removed:
   If @{term \<open>s = []\<close>} or  @{term \<open>t = []\<close>}, the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
-(*ToDo: WHILET statt WHILE*)
-      
+  (*ToDo: WHILET statt WHILE*)
+  
+subsection\<open>Invariants\<close>
+  definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
+    (\<forall>i' < i. \<not>is_substring_at t s i') \<and>
+    (case pos of None \<Rightarrow> j = 0
+      | Some p \<Rightarrow> p=i \<and> is_substring_at t s i)"
+  definition "I_in_nap t s iout \<equiv> \<lambda>(j,pos).
+    case pos of None \<Rightarrow> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
+      | Some p \<Rightarrow> is_substring_at t s iout"
+
+  definition "nap t s \<equiv> do {
+    let i=0;
+    let j=0;
+    let pos=None;
+    (_,_,pos) \<leftarrow> WHILEI (I_out_nap t s) (\<lambda>(i,_,pos). i\<le>length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (_,pos) \<leftarrow> WHILEI (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
+        let j=j+1;
+        if j=length s then RETURN (j,Some i) else RETURN (j,None)
+      }) (j,pos);
+      if pos=None then do {
+        let i = i + 1;
+        let j = 0;
+        RETURN (i,j,None)
+      } else RETURN (i,j,Some i)
+    }) (i,j,pos);
+
+    RETURN pos
+  }"
+  
+  lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
+    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>i'<i. \<not>is_substring_at t s i'))"
+    unfolding nap_def I_out_nap_def I_in_nap_def
+    apply refine_vcg apply vc_solve
+    apply (metis all_positions_substring less_antisym)
+    using less_Suc_eq apply blast
+    apply (metis less_SucE substring_all_positions)
+    by (auto split: option.split intro: leI le_less_trans substring_i)
+
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
   definition border :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where "border s j \<equiv> undefined"
@@ -167,7 +204,8 @@ subsection\<open>Algorithm\<close>
     apply refine_vcg  
     apply vc_solve
     oops
-      
+
+(*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
 section\<open>Notes and Tests\<close>
 
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
