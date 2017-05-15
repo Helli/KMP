@@ -131,7 +131,7 @@ subsection\<open>Basic form\<close>
     RETURN found
   }"
   
-  lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
     apply (refine_vcg 
@@ -145,7 +145,7 @@ subsection\<open>Basic form\<close>
     subgoal by (meson leI le_less_trans substring_i)
     done
   
-  text\<open>These preconditions cannot be removed: If @{term \<open>s = []\<close>} or  @{term \<open>t = []\<close>}, the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
+  text\<open>These preconditions cannot be removed: If @{term \<open>s = []\<close>} (or @{term \<open>t = []\<close>}), the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
   (*ToDo: WHILET statt WHILE*)
   
 subsection\<open>A variant returning the position\<close>
@@ -176,7 +176,7 @@ subsection\<open>A variant returning the position\<close>
     RETURN pos
   }"
   
-  lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>i'<i. \<not>is_substring_at t s i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
     apply (refine_vcg
