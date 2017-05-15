@@ -1,24 +1,7 @@
-(**)
-
 theory KMP
   imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
 begin
-(*
-theory Scratch
-  imports Main "~~/src/HOL/Library/Code_Target_Nat"
-begin
-  
-  fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-    t1: "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> False" |
-    t2: "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> False" |
-    "is_substring_at t [] 0 \<longleftrightarrow> False" |
-    "is_substring_at [] _ _ \<longleftrightarrow> False"
-    
-  export_code is_substring_at in SML  
-*)  
-  
-  
-  
+
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' t s i \<equiv> take (length s) (drop i t) = s"  
   
@@ -28,10 +11,6 @@ section\<open>Definition "substring"\<close>
   value "is_substring_at' [] [] 3"
   text\<open>Not very intuitive...\<close>
   
-  fun foo :: "nat \<Rightarrow> nat" where "foo 0 = 0" | "foo (Suc n) = n + 1"
-    
-  export_code foo in SML  
-    
   text\<open>For the moment, we use this instead:\<close>
   fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
     t1: "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
@@ -53,45 +32,7 @@ section\<open>Definition "substring"\<close>
   lemma "i \<le> length t \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> is_substring_at' t s i"
     unfolding is_substring_at'_def
     by (induction t s i rule: is_substring_at.induct) auto
-
-fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
-  where
-(*<*)  
-  "slice (x#xs) (Suc n) l = slice xs n l"
-| "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
-| "slice _ _ _ = []"  
-(*>*)    
-
-  (*<*)  
-  text \<open>Show that the length of a list slice is always less than or equal to 
-    the specified length:\<close>  
-  lemma "length (slice xs s l) \<le> l"
-  (*<*)  
-    by (induction xs s l rule: slice.induct) auto  
-  (*>*)    
-    
-  text \<open>Show that, if the start position and length are in range, the length 
-    of the slice is equal to the specified length\<close>
-  lemma "length xs \<ge> s + l \<Longrightarrow> length (slice xs s l) = l"
-  (*<*)  
-    by (induction xs s l rule: slice.induct) auto  
-  (*>*)
-  (*>*)
-      
-  lemma slice_char_aux: "is_substring_at ts ss 0 \<longleftrightarrow> ss = KMP.slice ts 0 (length ss)"
-    apply (induction ts arbitrary: ss)
-    subgoal for ss by (cases ss) auto  
-    subgoal for a ts ss by (cases ss) auto  
-    done    
-      
-  lemma "\<lbrakk> i<length t \<rbrakk> \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> s = slice t i (length s)"
-    apply (induction t s i rule: is_substring_at.induct) 
-    apply (auto simp: slice_char_aux)
-    done  
-    
-      
-      
-      
+  
   text\<open>However, the new definition has some reasonable properties:\<close>
   lemma substring_length_s: "is_substring_at t s i \<Longrightarrow> length s \<le> length t"
     apply (induction t s i rule: is_substring_at.induct)
@@ -141,8 +82,26 @@ fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list"
     "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
     by (induction t s i rule: is_substring_at.induct)
       (auto simp: nth_Cons')
-
-  (*Todo: third alternative: inductive is_substring_at*)
+  
+  text\<open>Another characterisation:\<close>
+  fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
+    where
+    "slice (x#xs) (Suc n) l = slice xs n l"
+  | "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
+  | "slice _ _ _ = []"  
+  
+  lemma slice_char_aux: "is_substring_at ts ss 0 \<longleftrightarrow> ss = KMP.slice ts 0 (length ss)"
+    apply (induction ts arbitrary: ss)
+    subgoal for ss by (cases ss) auto  
+    subgoal for a ts ss by (cases ss) auto  
+    done    
+  
+  lemma "\<lbrakk> i<length t \<rbrakk> \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> s = slice t i (length s)"
+    apply (induction t s i rule: is_substring_at.induct) 
+    apply (auto simp: slice_char_aux)
+    done  
+  
+  (*Todo: fourth alternative: inductive is_substring_at*)
 
 section\<open>Naive algorithm\<close>
 subsection\<open>Basic form\<close>
