@@ -3,7 +3,22 @@
 theory KMP
   imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
 begin
-
+(*
+theory Scratch
+  imports Main "~~/src/HOL/Library/Code_Target_Nat"
+begin
+  
+  fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
+    t1: "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> False" |
+    t2: "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> False" |
+    "is_substring_at t [] 0 \<longleftrightarrow> False" |
+    "is_substring_at [] _ _ \<longleftrightarrow> False"
+    
+  export_code is_substring_at in SML  
+*)  
+  
+  
+  
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' t s i \<equiv> take (length s) (drop i t) = s"  
   
@@ -13,13 +28,22 @@ section\<open>Definition "substring"\<close>
   value "is_substring_at' [] [] 3"
   text\<open>Not very intuitive...\<close>
   
+  fun foo :: "nat \<Rightarrow> nat" where "foo 0 = 0" | "foo (Suc n) = n + 1"
+    
+  export_code foo in SML  
+    
   text\<open>For the moment, we use this instead:\<close>
   fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-    "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
-    "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
+    t1: "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
+    t2: "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
     "is_substring_at t [] 0 \<longleftrightarrow> True" |
     "is_substring_at [] _ _ \<longleftrightarrow> False"
 
+  lemmas [code del] = t1 t2
+    
+  lemma [code]: "is_substring_at (t#ts) ss i \<longleftrightarrow> (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at ts (tl ss) 0 else is_substring_at ts ss (i-1))"  
+    by (cases ss; cases i; auto)
+    
   value "is_substring_at [5] [] 5"
   value "is_substring_at [5] [5] 5"
   value "is_substring_at [] [] 3"
@@ -29,6 +53,44 @@ section\<open>Definition "substring"\<close>
   lemma "i \<le> length t \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> is_substring_at' t s i"
     unfolding is_substring_at'_def
     by (induction t s i rule: is_substring_at.induct) auto
+
+fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
+  where
+(*<*)  
+  "slice (x#xs) (Suc n) l = slice xs n l"
+| "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
+| "slice _ _ _ = []"  
+(*>*)    
+
+  (*<*)  
+  text \<open>Show that the length of a list slice is always less than or equal to 
+    the specified length:\<close>  
+  lemma "length (slice xs s l) \<le> l"
+  (*<*)  
+    by (induction xs s l rule: slice.induct) auto  
+  (*>*)    
+    
+  text \<open>Show that, if the start position and length are in range, the length 
+    of the slice is equal to the specified length\<close>
+  lemma "length xs \<ge> s + l \<Longrightarrow> length (slice xs s l) = l"
+  (*<*)  
+    by (induction xs s l rule: slice.induct) auto  
+  (*>*)
+  (*>*)
+      
+  lemma slice_char_aux: "is_substring_at ts ss 0 \<longleftrightarrow> ss = KMP.slice ts 0 (length ss)"
+    apply (induction ts arbitrary: ss)
+    subgoal for ss by (cases ss) auto  
+    subgoal for a ts ss by (cases ss) auto  
+    done    
+      
+  lemma "\<lbrakk> i<length t \<rbrakk> \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> s = slice t i (length s)"
+    apply (induction t s i rule: is_substring_at.induct) 
+    apply (auto simp: slice_char_aux)
+    done  
+    
+      
+      
       
   text\<open>However, the new definition has some reasonable properties:\<close>
   lemma substring_length_s: "is_substring_at t s i \<Longrightarrow> length s \<le> length t"
@@ -95,8 +157,8 @@ subsection\<open>Basic form\<close>
     let i=0;
     let j=0;
     let found=False;
-    (_,_,found) \<leftarrow> WHILEI (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
-      (j,found) \<leftarrow> WHILEI (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
+    (_,_,found) \<leftarrow> WHILEIT (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
+      (j,found) \<leftarrow> WHILEIT (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
         let j=j+1;
         if j=length s then RETURN (j,True) else RETURN (j,False)
       }) (j,found);
@@ -113,11 +175,16 @@ subsection\<open>Basic form\<close>
   lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
     unfolding na_def I_out_na_def I_in_na_def
-    apply refine_vcg apply vc_solve
-    apply (metis all_positions_substring less_SucE)
-    using less_Suc_eq apply blast
-    apply (metis less_SucE substring_all_positions)
-    by (meson leI le_less_trans substring_i)
+    apply (refine_vcg 
+          WHILEIT_rule[where R="measure (\<lambda>(i,_,found). (length t - i) + (if found then 0 else 1))"]
+          WHILEIT_rule[where R="measure (\<lambda>(j,_::bool). length s - j)"]
+          ) 
+    apply (vc_solve solve: asm_rl)
+    subgoal apply (metis all_positions_substring less_SucE) done
+    subgoal using less_Suc_eq apply blast done
+    subgoal by (metis less_SucE substring_all_positions)
+    subgoal by (meson leI le_less_trans substring_i)
+    done
   
   text\<open>These preconditions cannot be removed: If @{term \<open>s = []\<close>} or  @{term \<open>t = []\<close>}, the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
   (*ToDo: WHILET statt WHILE*)
