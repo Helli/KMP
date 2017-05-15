@@ -161,8 +161,8 @@ subsection\<open>A variant returning the position\<close>
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEI (I_out_nap t s) (\<lambda>(i,_,pos). i\<le>length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (_,pos) \<leftarrow> WHILEI (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_out_nap t s) (\<lambda>(i,_,pos). i\<le>length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (_,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
@@ -179,7 +179,11 @@ subsection\<open>A variant returning the position\<close>
   lemma "\<lbrakk>s \<noteq> []; t \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>i'<i. \<not>is_substring_at t s i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
-    apply refine_vcg apply vc_solve
+    apply (refine_vcg
+      WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). (length t - i) + (if pos = None then 1 else 0))"]
+      WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
+      )
+    apply (vc_solve solve: asm_rl)
     apply (metis all_positions_substring less_antisym)
     using less_Suc_eq apply blast
     apply (metis less_SucE substring_all_positions)
