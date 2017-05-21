@@ -201,21 +201,22 @@ subsection\<open>Invariants\<close>
 
 subsection\<open>Algorithm\<close>
   definition "kmp t s \<equiv> do {
-    let i=0; let j=0;
-
-    (_,_,found) \<leftarrow> WHILEI I_outer (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
-      (j,found) \<leftarrow> WHILEI (I_inner i j) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
+    let i=0;
+    let j=0;
+    let pos=None;
+    (_,_,pos) \<leftarrow> WHILEI I_outer (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILEI (I_inner i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
-        if j=length s then RETURN (j,True) else RETURN (j,False)
-      }) (j,found);
-      if \<not>found then do {
+        if j=length s then RETURN (j,Some i) else RETURN (j,None)
+      }) (j,pos);
+      if pos=None then do {
         let i = i + (j + 1 - border s j);
         let j = max 0 (border s j - 1); (*max not necessary*)
-        RETURN (i,j,False)
-      } else RETURN (i,j,True)
-    }) (i,j,False);
+        RETURN (i,j,None)
+      } else RETURN (i,j,Some i)
+    }) (i,j,pos);
 
-    RETURN found
+    RETURN pos
   }"
         
   lemma substring_substring:
