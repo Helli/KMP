@@ -1,64 +1,60 @@
 theory KMP
   imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
+    "~~/src/HOL/Library/Sublist"
 begin
 
 section\<open>Definition "substring"\<close>
-  definition "is_substring_at' t s i \<equiv> take (length s) (drop i t) = s"  
+  definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
   
   text\<open>Problem:\<close>
-  value "is_substring_at' [5] [] 5"
-  value "is_substring_at' [5] [5] 5"
+  value "is_substring_at' [] [a] 5"
+  value "is_substring_at' [a] [a] 5"
   value "is_substring_at' [] [] 3"
   text\<open>Not very intuitive...\<close>
   
   text\<open>For the moment, we use this instead:\<close>
   fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-    t1: "is_substring_at (t#ts) (s#ss) 0 \<longleftrightarrow> t=s \<and> is_substring_at ts ss 0" |
-    t2: "is_substring_at (t#ts) ss (Suc i) \<longleftrightarrow> is_substring_at ts ss i" |
-    "is_substring_at t [] 0 \<longleftrightarrow> True" |
-    "is_substring_at [] _ _ \<longleftrightarrow> False"
+    t1: "is_substring_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> is_substring_at ss ts 0" |
+    t2: "is_substring_at ss (t#ts) (Suc i) \<longleftrightarrow> is_substring_at ss ts i" |
+    "is_substring_at [] t 0 \<longleftrightarrow> True" |
+    "is_substring_at _ [] _ \<longleftrightarrow> False"
 
   lemmas [code del] = t1 t2
     
-  lemma [code]: "is_substring_at (t#ts) ss i \<longleftrightarrow> (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at ts (tl ss) 0 else is_substring_at ts ss (i-1))"  
+  lemma [code]: "is_substring_at ss (t#ts) i \<longleftrightarrow> (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at (tl ss) ts 0 else is_substring_at ss ts (i-1))"  
     by (cases ss; cases i; auto)
-    
-  value "is_substring_at [5] [] 5"
-  value "is_substring_at [5] [5] 5"
-  value "is_substring_at [] [] 3"
-  text\<open>Better, I suppose?\<close>
   
   text\<open>For all relevant cases, both definitions agree:\<close>
-  lemma "i \<le> length t \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> is_substring_at' t s i"
+  lemma "i \<le> length t \<Longrightarrow> is_substring_at s t i \<longleftrightarrow> is_substring_at' s t i"
     unfolding is_substring_at'_def
-    by (induction t s i rule: is_substring_at.induct) auto
+    by (induction s t i rule: is_substring_at.induct) auto
   
   text\<open>However, the new definition has some reasonable properties:\<close>
-  lemma substring_length_s: "is_substring_at t s i \<Longrightarrow> length s \<le> length t"
-    apply (induction t s i rule: is_substring_at.induct)
+  lemma substring_length_s: "is_substring_at s t i \<Longrightarrow> length s \<le> length t"
+    apply (induction s t i rule: is_substring_at.induct)
     apply simp_all
     done
   
-  lemma substring_i: "is_substring_at t s i \<Longrightarrow> i \<le> length t - length s"
-    apply (induction t s i rule: is_substring_at.induct)
+  lemma substring_i: "is_substring_at s t i \<Longrightarrow> i \<le> length t - length s"
+    apply (induction s t i rule: is_substring_at.induct)
     apply (auto simp add: Suc_diff_le substring_length_s)
     done
   
   text\<open>Furthermore, we need:\<close>
   
   lemma substring_step:
-    "\<lbrakk>length s + i < length t; is_substring_at t s i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at t (s@[x]) i"
-    apply (induction t s i rule: is_substring_at.induct)
+    "\<lbrakk>length s + i < length t; is_substring_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at (s@[x]) t i"
+    apply (induction s t i rule: is_substring_at.induct)
     apply auto
     using is_substring_at.elims(3) by fastforce
   
-  lemma Nil_is_substring: "i \<le> length t \<Longrightarrow> is_substring_at t [] i"
+  lemma Nil_is_substring: "i \<le> length t \<Longrightarrow> is_substring_at [] t i"
     apply (induction t arbitrary: i)
     apply auto
     using is_substring_at.elims(3) by force
   
   lemma all_positions_substring:
-  "\<lbrakk>length s \<le> length t; i \<le> length t - length s; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at t s i"
+  "\<lbrakk>length s \<le> length t; i \<le> length t - length s; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at s t i"
   proof (induction s rule: rev_induct)
     case Nil
     then show ?case by (simp add: Nil_is_substring)
@@ -69,7 +65,7 @@ section\<open>Definition "substring"\<close>
       using snoc.prems(2) by auto
     moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
       by (metis le_refl length_append less_le_trans nth_append snoc.prems(3) trans_le_add1)
-    ultimately have f: "is_substring_at t xs i"
+    ultimately have f: "is_substring_at xs t i"
       using snoc.IH by blast
     show ?case
       apply (rule substring_step)
@@ -79,8 +75,8 @@ section\<open>Definition "substring"\<close>
   qed
   
   lemma substring_all_positions:
-    "is_substring_at t s i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
-    by (induction t s i rule: is_substring_at.induct)
+    "is_substring_at s t i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
+    by (induction s t i rule: is_substring_at.induct)
       (auto simp: nth_Cons')
   
   text\<open>Another characterisation:\<close>
@@ -90,27 +86,27 @@ section\<open>Definition "substring"\<close>
   | "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
   | "slice _ _ _ = []"  
   
-  lemma slice_char_aux: "is_substring_at ts ss 0 \<longleftrightarrow> ss = KMP.slice ts 0 (length ss)"
-    apply (induction ts arbitrary: ss)
-    subgoal for ss by (cases ss) auto  
-    subgoal for a ts ss by (cases ss) auto  
+  lemma slice_char_aux: "is_substring_at s t 0 \<longleftrightarrow> s = KMP.slice t 0 (length s)"
+    apply (induction t arbitrary: s)
+    subgoal for s by (cases s) auto  
+    subgoal for _ _ s by (cases s) auto  
     done    
   
-  lemma "\<lbrakk> i<length t \<rbrakk> \<Longrightarrow> is_substring_at t s i \<longleftrightarrow> s = slice t i (length s)"
-    apply (induction t s i rule: is_substring_at.induct) 
+  lemma slice_char: "i\<le>length t \<Longrightarrow> is_substring_at s t i \<longleftrightarrow> s = slice t i (length s)"
+    apply (induction s t i rule: is_substring_at.induct) 
     apply (auto simp: slice_char_aux)
-    done  
+    done
   
   (*Todo: fourth alternative: inductive is_substring_at*)
 
 section\<open>Naive algorithm\<close>
 subsection\<open>Basic form\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
-    \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at t s i')
-    \<or> found \<and> is_substring_at t s i"
+    \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at s t i')
+    \<or> found \<and> is_substring_at s t i"
   definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
     \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
-    \<or> found \<and> j = length s \<and> is_substring_at t s iout"
+    \<or> found \<and> j = length s \<and> is_substring_at s t iout"
   
   definition "na t s \<equiv> do {
     let i=0;
@@ -132,7 +128,7 @@ subsection\<open>Basic form\<close>
   }"
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
+    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at s t i))"
     unfolding na_def I_out_na_def I_in_na_def
     apply (refine_vcg 
           WHILEIT_rule[where R="measure (\<lambda>(i,_,found). (length t - i) + (if found then 0 else 1))"]
@@ -149,12 +145,12 @@ subsection\<open>Basic form\<close>
   
 subsection\<open>A variant returning the position\<close>
   definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
-    (\<forall>i' < i. \<not>is_substring_at t s i') \<and>
+    (\<forall>i' < i. \<not>is_substring_at s t i') \<and>
     (case pos of None \<Rightarrow> j = 0
-      | Some p \<Rightarrow> p=i \<and> is_substring_at t s i)"
+      | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
   definition "I_in_nap t s iout \<equiv> \<lambda>(j,pos).
     case pos of None \<Rightarrow> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
-      | Some p \<Rightarrow> is_substring_at t s iout"
+      | Some p \<Rightarrow> is_substring_at s t iout"
 
   definition "nap t s \<equiv> do {
     let i=0;
@@ -176,7 +172,7 @@ subsection\<open>A variant returning the position\<close>
   }"
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at t s i | Some i \<Rightarrow> is_substring_at t s i \<and> (\<forall>i'<i. \<not>is_substring_at t s i'))"
+    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
@@ -190,28 +186,67 @@ subsection\<open>A variant returning the position\<close>
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
-  definition border :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where "border s j \<equiv> undefined"
+  definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
   
+  lemma substring_unique: "\<lbrakk>is_substring_at s t i; is_substring_at s' t i; length s = length s'\<rbrakk> \<Longrightarrow> s = s'"
+    by (metis nth_equalityI substring_all_positions)
+  
+  lemma border_length_r: "border r w \<Longrightarrow> length r \<le> length w"
+    unfolding border_def by (simp add: prefix_length_le)
+  
+  lemma border_unique: "\<lbrakk>border r w; border r' w; length r = length r'\<rbrakk> \<Longrightarrow> r = r'"
+    unfolding border_def by (metis order_mono_setup.refl prefix_length_prefix prefix_order.eq_iff)
+  
+  lemma border_lengths_differ: "\<lbrakk>border r w; border r' w; r\<noteq>r'\<rbrakk> \<Longrightarrow> length r \<noteq> length r'"
+    using border_unique by auto
+
+  definition "intrinsic_border r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
+    (\<nexists>r'. border r' w \<and> r'\<noteq>w \<and> length r' > length r)"
+  
+  lemma ib_unique: "\<lbrakk>intrinsic_border r w; intrinsic_border r' w\<rbrakk> \<Longrightarrow> r = r'"
+    by (metis border_unique intrinsic_border_def nat_neq_iff)
+    
+  lemma ib_length_r: "intrinsic_border r w \<Longrightarrow> length r < length w"
+  unfolding intrinsic_border_def using border_length_r[of r w, THEN le_neq_implies_less] border_lengths_differ[of r w w] ib_unique[of r] oops
+
+  lemma test: "intrinsic_border [] [z]"
+    unfolding intrinsic_border_def border_def by simp (meson list_se_match(4) suffixE)  
+  
+  lemma test2: "(\<some>w. intrinsic_border w [z]) = []"
+    by (meson ib_unique someI test)
+
+  text\<open>"Intrinsic border length plus one"\<close>
+  fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
+    "iblp1 s 0 = 0"(*by definition*) |
+    "iblp1 s a = length (\<some>r. intrinsic_border r (take a s)) + 1"
   (*Todo: Properties*)
+  
+  lemma "w\<noteq>[] \<Longrightarrow> iblp1 w 1 = 1"
+      by (simp add: take_Suc0(1) test2)
   thm longest_common_prefix
 
 subsection\<open>Invariants\<close>
-  definition "I_outer \<equiv> \<lambda>(i,j,found). undefined"  
-  definition "I_inner iout jout \<equiv> \<lambda>(j,found). undefined"  
-
+  definition "I_outer t s \<equiv> \<lambda>(i,j,pos).
+    (\<forall>i'<i. \<not>is_substring_at t s i') \<and>
+    (case pos of None \<Rightarrow> (*j = 0*) (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
+      | Some p \<Rightarrow> p=i \<and> is_substring_at t s i)"
+  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos). jout\<le>j \<and>
+    (case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
+      | Some p \<Rightarrow> is_substring_at t s iout)"
+  
 subsection\<open>Algorithm\<close>
   definition "kmp t s \<equiv> do {
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEI I_outer (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (j,pos) \<leftarrow> WHILEI (I_inner i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (_,_,pos) \<leftarrow> WHILEI (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILEI (I_inner t s i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
       if pos=None then do {
-        let i = i + (j + 1 - border s j);
-        let j = max 0 (border s j - 1); (*max not necessary*)
+        let i = i + (j + 1 - iblp1 s j);
+        let j = max 0 (iblp1 s j - 1); (*max not necessary*)
         RETURN (i,j,None)
       } else RETURN (i,j,Some i)
     }) (i,j,pos);
@@ -220,16 +255,21 @@ subsection\<open>Algorithm\<close>
   }"
         
   lemma substring_substring:
-    "\<lbrakk>is_substring_at t s1 i; is_substring_at t s2 (i + length s1)\<rbrakk> \<Longrightarrow> is_substring_at t (s1@s2) i"
-    apply (induction t s1 i rule: is_substring_at.induct)
+    "\<lbrakk>is_substring_at s1 t i; is_substring_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> is_substring_at (s1@s2) t i"
+    apply (induction s1 t i rule: is_substring_at.induct)
     apply auto
     done
-
     
-  lemma "kmp t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at t s i))"
-    unfolding kmp_def
-    apply refine_vcg  
-    apply vc_solve
+  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'\<le>i. \<not>is_substring_at s t i'))"
+    unfolding kmp_def I_outer_def I_inner_def
+    apply refine_vcg
+             apply (vc_solve solve: asm_rl) oops
+    apply (metis all_positions_substring less_SucE)
+    using less_antisym apply blast
+    subgoal for i iout j i'  sorry
+    subgoal for i j sorry
+      apply (auto split: option.split intro: leI le_less_trans substring_i)
     oops
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
@@ -266,4 +306,70 @@ section\<open>Notes and Tests\<close>
     apply auto  
     done
   
+  lemma ex_ib: "w\<noteq>[] \<Longrightarrow> \<exists>r. intrinsic_border r w"
+  proof (induction w rule: length_induct)
+    case (1 xs)
+    then obtain bl l where decomp: "xs = bl @ [l]" using list_rev_decomp by blast
+    show ?case
+    proof (cases "bl=[]")
+      case True
+      then show ?thesis using test decomp by fastforce
+    next
+      case False
+      then obtain r where "intrinsic_border r bl" using 1 decomp by auto
+      then show ?thesis
+        apply (cases "border (r@[l]) xs")
+        sorry
+    qed
+  qed
+  
+  lemma "w\<noteq>[] \<Longrightarrow> \<exists>!r. intrinsic_border r w"
+    using ib_unique ex_ib by blast
+  
+section\<open>Example\<close>
+  lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
+    ''''
+    }"
+    apply (auto simp: border_def slice_char_aux)
+    done
+    
+  lemma ex1: "border a ''a'' \<longleftrightarrow> a\<in>{
+    '''',
+    ''a''
+    }" unfolding border_def apply auto
+      by (meson list_se_match(4) suffixE)
+  
+  lemma ex2: "border a ''aa'' \<longleftrightarrow> a\<in>{
+    '''',
+    ''a'',
+    ''aa''
+    }"
+    apply (auto simp: border_def)
+    apply (smt list.inject prefix_Cons prefix_bot.bot.extremum_uniqueI)
+    by (simp add: suffix_ConsI)
+
+  lemma ex3: "border a ''aab'' \<longleftrightarrow> a\<in>{
+    '''',
+    ''aab''
+    }"
+    apply (auto simp: border_def)
+    using ex2 oops
+    
+  lemma ex7: "border a ''aabaaba'' \<longleftrightarrow> a\<in>{
+    '''',
+    ''a'',
+    ''aaba'',
+    ''aabaaba''}"
+    apply (auto simp: border_def)
+    oops
+    
+  lemma ex8: "border a ''aabaabaa'' \<longleftrightarrow> a\<in>{
+    '''',
+    ''a'',
+    ''aa'',
+    ''aabaa'',
+    ''aabaabaa''}"
+    apply (auto simp: border_def) oops
+
 end
+  (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy. Arg_max is then available, too.*)
