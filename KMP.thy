@@ -199,30 +199,74 @@ subsection\<open>Auxiliary definitions\<close>
   
   lemma border_lengths_differ: "\<lbrakk>border r w; border r' w; r\<noteq>r'\<rbrakk> \<Longrightarrow> length r \<noteq> length r'"
     using border_unique by auto
-
-  definition "intrinsic_border r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
-    (\<nexists>r'. border r' w \<and> r'\<noteq>w \<and> length r' > length r)"
   
-  lemma ib_unique: "\<lbrakk>intrinsic_border r w; intrinsic_border r' w\<rbrakk> \<Longrightarrow> r = r'"
-    by (metis border_unique intrinsic_border_def nat_neq_iff)
+  lemma Nil_is_border[simp]: "border [] w"
+    unfolding border_def by simp
+  
+  lemma border_length_r_less: "\<forall>r. r \<noteq> w \<and> border r w \<longrightarrow> length r < length w"
+    unfolding border_def using not_equal_is_parallel prefix_length_le by fastforce
+  
+subsection\<open>Greatest and Least\<close>
+  lemma GreatestM_natI2:
+    fixes m::"_\<Rightarrow>nat"
+    assumes "P x"
+      and "\<forall>y. P y \<longrightarrow> m y < b"
+      and "\<And>x. P x \<Longrightarrow> Q x"
+    shows "Q (GreatestM m P)"
+  by (fact GreatestM_natI[OF assms(1,2), THEN assms(3)])
+  
+  lemma Greatest_nat_Least:
+    fixes m::"_\<Rightarrow>nat"
+    assumes "\<forall>y. P y \<longrightarrow> m y \<le> b"
+    shows "GreatestM m P = LeastM (\<lambda>a. b - m a) P"
+    proof -
+    have a: "(\<forall>y. P y \<longrightarrow> b - m x \<le> b - m y) \<longleftrightarrow> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for x
+      using assms diff_le_mono2 by fastforce
+    show ?thesis unfolding LeastM_def GreatestM_def a..
+  qed
     
-  lemma ib_length_r: "intrinsic_border r w \<Longrightarrow> length r < length w"
-  unfolding intrinsic_border_def using border_length_r[of r w, THEN le_neq_implies_less] border_lengths_differ[of r w w] ib_unique[of r] oops
-
-  lemma test: "intrinsic_border [] [z]"
-    unfolding intrinsic_border_def border_def by simp (meson list_se_match(4) suffixE)  
+  lemma Least_nat_Greatest:
+    fixes m::"_\<Rightarrow>nat"
+    assumes "\<forall>y. P y \<longrightarrow> m y < b"
+    shows "LeastM m P = GreatestM (\<lambda>a. b - m a) P"
+  proof -
+    have a: "(\<forall>y. P y \<longrightarrow> b - m y \<le> b - m x) \<longleftrightarrow> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for x
+      using assms diff_le_mono2 by force
+    show ?thesis unfolding LeastM_def GreatestM_def a..
+  qed
   
-  lemma test2: "(\<some>w. intrinsic_border w [z]) = []"
-    by (meson ib_unique someI test)
+  lemmas least_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for P m, folded LeastM_def, simplified]
+  lemmas greatest_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for P m, folded GreatestM_def, no_vars]
+  
+  definition "intrinsic_border w \<equiv> GREATEST r WRT length. r\<noteq>w \<and> border r w"   
+  
+  definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
+    (\<nexists>r'. r'\<noteq>w \<and> border r' w \<and> length r < length r')"
+
+  lemma "w \<noteq> [] \<Longrightarrow> intrinsic_border' (intrinsic_border w) w"
+  unfolding intrinsic_border_def intrinsic_border'_def
+  apply (rule conjI)
+    apply (rule GreatestM_natI2[of "\<lambda>r. r \<noteq> w \<and> border r w" "[]" length "length w"])
+     apply (simp_all add: border_length_r_less)[3]
+    apply (rule conjI)
+    apply (rule GreatestM_natI2[of "\<lambda>r. r \<noteq> w \<and> border r w" "[]" length "length w"])
+     apply (simp_all add: border_length_r_less)[3]
+    apply auto
+    using GreatestM_nat_le[OF _ border_length_r_less, of _ w]
+    by (simp add: leD)
+  
+  lemma ib_unique: "\<lbrakk>intrinsic_border' r w; intrinsic_border' r' w\<rbrakk> \<Longrightarrow> r = r'"
+    by (metis border_unique intrinsic_border'_def nat_neq_iff)
+  
+  lemma ib_length_r: "intrinsic_border' r w \<Longrightarrow> length r < length w"
+    using border_length_r_less intrinsic_border'_def by blast
 
   text\<open>"Intrinsic border length plus one"\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
     "iblp1 s 0 = 0"(*by definition*) |
-    "iblp1 s a = length (\<some>r. intrinsic_border r (take a s)) + 1"
-  (*Todo: Properties*)
+    "iblp1 s j = length (intrinsic_border (take j s)) + 1"
+  (*Todo: Properties. They will need j \<le> length s*)
   
-  lemma "w\<noteq>[] \<Longrightarrow> iblp1 w 1 = 1"
-      by (simp add: take_Suc0(1) test2)
   thm longest_common_prefix
 
 subsection\<open>Invariants\<close>
@@ -303,30 +347,16 @@ section\<open>Notes and Tests\<close>
   lemma "x\<ge>0 \<Longrightarrow> test2 x \<le> SPEC (\<lambda>r. r=x*5)"
     unfolding test2_def i_test2_def
     apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
-    apply auto  
+    apply auto
     done
   
-  lemma ex_ib: "w\<noteq>[] \<Longrightarrow> \<exists>r. intrinsic_border r w"
-  proof (induction w rule: length_induct)
-    case (1 xs)
-    then obtain bl l where decomp: "xs = bl @ [l]" using list_rev_decomp by blast
-    show ?case
-    proof (cases "bl=[]")
-      case True
-      then show ?thesis using test decomp by fastforce
-    next
-      case False
-      then obtain r where "intrinsic_border r bl" using 1 decomp by auto
-      then show ?thesis
-        apply (cases "border (r@[l]) xs")
-        sorry
-    qed
-  qed
+section\<open>Examples\<close>
+  lemma test: "intrinsic_border [] [z]"
+    unfolding intrinsic_border_def border_def by simp (meson list_se_match(4) suffixE)
   
-  lemma "w\<noteq>[] \<Longrightarrow> \<exists>!r. intrinsic_border r w"
-    using ib_unique ex_ib by blast
+  lemma test2: "(\<some>w. intrinsic_border w [z]) = []"
+    by (meson ib_unique someI test)
   
-section\<open>Example\<close>
   lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
     ''''
     }"
