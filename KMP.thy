@@ -271,12 +271,12 @@ subsection\<open>Greatest and Least\<close>
 
 subsection\<open>Invariants\<close>
   definition "I_outer t s \<equiv> \<lambda>(i,j,pos).
-    (\<forall>i'<i. \<not>is_substring_at t s i') \<and>
+    (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
     (case pos of None \<Rightarrow> (*j = 0*) (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
-      | Some p \<Rightarrow> p=i \<and> is_substring_at t s i)"
-  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos). jout\<le>j \<and>
+      | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
+  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos). jout \<le> j \<and>
     (case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
-      | Some p \<Rightarrow> is_substring_at t s iout)"
+      | Some p \<Rightarrow> is_substring_at s t iout)"
   
 subsection\<open>Algorithm\<close>
   definition "kmp t s \<equiv> do {
@@ -303,19 +303,19 @@ subsection\<open>Algorithm\<close>
     apply (induction s1 t i rule: is_substring_at.induct)
     apply auto
     done
-    
+  
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'\<le>i. \<not>is_substring_at s t i'))"
+    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding kmp_def I_outer_def I_inner_def
     apply refine_vcg
-             apply (vc_solve solve: asm_rl) oops
-    apply (metis all_positions_substring less_SucE)
+    apply (vc_solve solve: asm_rl)
+    subgoal for i jout j by (metis all_positions_substring less_SucE)
     using less_antisym apply blast
-    subgoal for i iout j i'  sorry
-    subgoal for i j sorry
-      apply (auto split: option.split intro: leI le_less_trans substring_i)
-    oops
-
+    subgoal for i jout j i' sorry
+    subgoal for i jout j sorry
+    apply (auto split: option.split intro: leI le_less_trans substring_i)
+    done
+    
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
 section\<open>Notes and Tests\<close>
 
