@@ -238,7 +238,7 @@ subsection\<open>Greatest and Least\<close>
   lemmas least_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for P m, folded LeastM_def, simplified]
   lemmas greatest_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for P m, folded GreatestM_def, no_vars]
   
-  definition "intrinsic_border w \<equiv> GREATEST r WRT length. r\<noteq>w \<and> border r w"   
+  definition "intrinsic_border w \<equiv> GREATEST r WRT length . r\<noteq>w \<and> border r w"   
   
   definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
     (\<nexists>r'. r'\<noteq>w \<and> border r' w \<and> length r < length r')"
@@ -261,7 +261,7 @@ subsection\<open>Greatest and Least\<close>
   lemma ib_length_r: "intrinsic_border' r w \<Longrightarrow> length r < length w"
     using border_length_r_less intrinsic_border'_def by blast
 
-  text\<open>"Intrinsic border length plus one"\<close>
+  text\<open>"Intrinsic border length plus one (only useful for @{term "s \<noteq> []"})"\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
     "iblp1 s 0 = 0"(*by definition*) |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
@@ -283,8 +283,8 @@ subsection\<open>Algorithm\<close>
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEI (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (j,pos) \<leftarrow> WHILEI (I_inner t s i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILEIT (I_inner t s i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
@@ -307,15 +307,19 @@ subsection\<open>Algorithm\<close>
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding kmp_def I_outer_def I_inner_def
-    apply refine_vcg
+    apply (refine_vcg
+      WHILEIT_rule[where R="measures [\<lambda>(i,j,pos). length t - i - j + (if pos = None then 1 else 0), \<lambda>(i,j,pos). length t - i]"]
+      WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
+      )
     apply (vc_solve solve: asm_rl)
     subgoal for i jout j by (metis all_positions_substring less_SucE)
     using less_antisym apply blast
     subgoal for i jout j i' sorry
     subgoal for i jout j sorry
-    apply (auto split: option.split intro: leI le_less_trans substring_i)
+    subgoal (*termination, needs lemmas from p. 576*) sorry
+    apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
-    
+  
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
 section\<open>Notes and Tests\<close>
 
