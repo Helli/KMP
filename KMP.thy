@@ -186,6 +186,7 @@ subsection\<open>A variant returning the position\<close>
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
+  text\<open>Borders of words\<close>
   definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
   
   lemma substring_unique: "\<lbrakk>is_substring_at s t i; is_substring_at s' t i; length s = length s'\<rbrakk> \<Longrightarrow> s = s'"
@@ -243,7 +244,7 @@ subsection\<open>Greatest and Least\<close>
   definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
     (\<nexists>r'. r'\<noteq>w \<and> border r' w \<and> length r < length r')"
 
-  lemma "w \<noteq> [] \<Longrightarrow> intrinsic_border' (intrinsic_border w) w"
+  lemma ib'_ib: "w \<noteq> [] \<Longrightarrow> intrinsic_border' (intrinsic_border w) w"
   unfolding intrinsic_border_def intrinsic_border'_def
   apply (rule conjI)
     apply (rule GreatestM_natI2[of "\<lambda>r. r \<noteq> w \<and> border r w" "[]" length "length w"])
@@ -255,17 +256,51 @@ subsection\<open>Greatest and Least\<close>
     using GreatestM_nat_le[OF _ border_length_r_less, of _ w]
     by (simp add: leD)
   
-  lemma ib_unique: "\<lbrakk>intrinsic_border' r w; intrinsic_border' r' w\<rbrakk> \<Longrightarrow> r = r'"
+  lemma ib'_unique: "\<lbrakk>intrinsic_border' r w; intrinsic_border' r' w\<rbrakk> \<Longrightarrow> r = r'"
     by (metis border_unique intrinsic_border'_def nat_neq_iff)
   
-  lemma ib_length_r: "intrinsic_border' r w \<Longrightarrow> length r < length w"
+  lemma ib'_length_r: "intrinsic_border' r w \<Longrightarrow> length r < length w"
     using border_length_r_less intrinsic_border'_def by blast
+  
+  lemma "needed?": "w \<noteq> [] \<Longrightarrow> let r = intrinsic_border w in r \<noteq> w \<and> border r w"
+    unfolding intrinsic_border_def Let_def
+    thm GreatestM_natI[of _ "[]"]
+    apply (rule GreatestM_natI[of _ "[]"])
+    using Nil_is_border apply blast
+    using border_length_r_less apply auto
+      done
+  
+  lemmas intrinsic_borderI = GreatestM_natI[of "\<lambda>r. r \<noteq> w \<and> border r w" "[]" length "length w", OF _ border_length_r_less, folded intrinsic_border_def, simplified]
+  
+  lemmas intrinsic_border_greatest = GreatestM_nat_le[of "\<lambda>r. r \<noteq> w \<and> border r w" _ length "length w", OF _ border_length_r_less, folded intrinsic_border_def]
+  
+  lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border w) < length w"
+    using intrinsic_borderI border_length_r_less by fastforce
 
   text\<open>"Intrinsic border length plus one (only useful for @{term "s \<noteq> []"})"\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
     "iblp1 s 0 = 0"(*by definition*) |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   (*Todo: Properties. They will need j \<le> length s*)
+  
+  lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
+    by (cases j) simp_all
+      
+  lemma iblp1_le: "s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j \<le> j"
+    apply (cases j)
+     apply simp_all
+      by (metis (no_types, lifting) Suc_le_eq Suc_neq_Zero intrinsic_border_less leI length_take less_irrefl_nat less_le_trans min.absorb2 take_eq_Nil)
+  
+  lemma "p576 et seq":
+    assumes
+      "s \<noteq> []" "j \<le> length s" and
+      assignments:
+      "i' = i + (j + 1 - iblp1 s j)"
+      "j' = max 0 (iblp1 s j - 1)"
+    shows
+      sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed? (≙Sinn von S.576?)*) and
+      i_increase: "i' > i"
+    using assignments by (auto simp: iblp1_le[OF assms(1-2), THEN le_imp_less_Suc])
   
   thm longest_common_prefix
 
@@ -308,7 +343,7 @@ subsection\<open>Algorithm\<close>
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding kmp_def I_outer_def I_inner_def
     apply (refine_vcg
-      WHILEIT_rule[where R="measures [\<lambda>(i,j,pos). length t - i - j + (if pos = None then 1 else 0), \<lambda>(i,j,pos). length t - i]"]
+      WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
       )
     apply (vc_solve solve: asm_rl)
@@ -316,10 +351,10 @@ subsection\<open>Algorithm\<close>
     using less_antisym apply blast
     subgoal for i jout j i' sorry
     subgoal for i jout j sorry
-    subgoal (*termination, needs lemmas from p. 576*) sorry
+    subgoal for i _ j using i_increase[of s j _ i, simplified] by fastforce
     apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
-  
+
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
 section\<open>Notes and Tests\<close>
 
