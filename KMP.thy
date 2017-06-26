@@ -60,7 +60,7 @@ section\<open>Definition "substring"\<close>
     then show ?case by (simp add: Nil_is_substring)
   next
     case (snoc x xs)
-    from `length (xs @ [x]) \<le> length t` have "length xs \<le> length t" by simp
+    from \<open>length (xs @ [x]) \<le> length t\<close> have "length xs \<le> length t" by simp
     moreover have "i \<le> length t - length xs"
       using snoc.prems(2) by auto
     moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
@@ -69,7 +69,7 @@ section\<open>Definition "substring"\<close>
       using snoc.IH by blast
     show ?case
       apply (rule substring_step)
-      using snoc.prems(1) snoc.prems(2) apply auto[1]
+      using snoc.prems(1) snoc.prems(2) apply auto[]
       apply (fact f)
       by (simp add: snoc.prems(3))
   qed
@@ -79,7 +79,7 @@ section\<open>Definition "substring"\<close>
     by (induction s t i rule: is_substring_at.induct)
       (auto simp: nth_Cons')
   
-  text\<open>Another characterisation:\<close>
+  text\<open>Other characterisations:\<close>
   fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
     where
     "slice (x#xs) (Suc n) l = slice xs n l"
@@ -97,7 +97,27 @@ section\<open>Definition "substring"\<close>
     apply (auto simp: slice_char_aux)
     done
   
-  (*Todo: fourth alternative: inductive is_substring_at*)
+  lemma substring_altdef: "is_substring_at s t i \<longleftrightarrow> (\<exists>xs ys. xs@s@ys = t \<and> length xs = i)"
+  proof (induction s t i rule: is_substring_at.induct)
+    case (2 ss t ts i)
+    show "is_substring_at ss (t # ts) (Suc i) \<longleftrightarrow> (\<exists>xs ys. xs @ ss @ ys = t # ts \<and> length xs = Suc i)"
+      (is "?lhs \<longleftrightarrow> ?rhs")
+    proof
+      assume ?lhs
+      then have "is_substring_at ss ts i" by simp
+      with "2.IH" obtain xs where "\<exists>ys. ts = xs @ ss @ ys \<and> i = length xs" by auto
+      then have "\<exists>ys. (t#xs) @ ss @ ys = t # ts \<and> length (t#xs) = Suc i" by auto
+      then show ?rhs by blast
+    next
+      assume ?rhs
+      then obtain xs where "\<exists>ys. xs @ ss @ ys = t # ts \<and> length xs = Suc i" by blast
+      then have "\<exists>ys. (tl xs) @ ss @ ys = ts \<and> length (tl xs) = i"
+        by (metis Suc_length_conv len_greater_imp_nonempty list.sel(3) tl_append2 zero_less_Suc)
+      then have "\<exists>xs ys. xs @ ss @ ys = ts \<and> length xs = i" by blast
+      with "2.IH" show ?lhs by simp
+    qed
+  qed auto
+  (*Todo: fifth alternative: inductive is_substring_at*)
 
 section\<open>Naive algorithm\<close>
 subsection\<open>Basic form\<close>
@@ -206,10 +226,32 @@ subsection\<open>Auxiliary definitions\<close>
   
   lemma border_length_r_less: "\<forall>r. r \<noteq> w \<and> border r w \<longrightarrow> length r < length w"
     unfolding border_def using not_equal_is_parallel prefix_length_le by fastforce
-      
+  
   lemma border_positions: "border r w \<Longrightarrow> \<forall>j<length r. w!j = w!(length w - length r + j)" unfolding border_def
     by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
   
+  lemmas nth_stuff = nth_take nth_take_lemma nth_equalityI
+  
+  (*Todo: swap names, add i+\<dots>, decide whether w instead of x and w is enough*)
+  lemma all_positions_drop_length_take: "\<lbrakk>i \<le> length w; i \<le> length x;
+    \<forall>j<i. x ! j = w ! (length w + j - i)\<rbrakk>
+      \<Longrightarrow> drop (length w - i) w = take i x"
+    by (cases "i = length x") (simp_all add: nth_equalityI)
+  
+  lemma all_positions_suffix_take: "\<lbrakk>i \<le> length w; i \<le> length x;
+    \<forall>j<i. x ! j = w ! (length w + j - i)\<rbrakk>
+      \<Longrightarrow> suffix (take i x) w"
+    by (metis all_positions_drop_length_take suffix_drop)
+  
+  thm suffix_drop take_is_prefix (* That naming -.- *)
+  
+  lemma border_take: "i \<le> length w \<Longrightarrow> \<forall>j<i. w!j = w!(length w - i + j)
+    \<Longrightarrow> border (take i w) w" unfolding border_def
+    by (metis all_positions_suffix_take add_diff_assoc2 take_is_prefix)
+  
+  lemma positions_border: "\<forall>j<i. w!j = w!(length w - i + j) \<Longrightarrow> border (take i w) w"
+    by (metis border_def border_take less_imp_le_nat not_le suffix_refl take_all take_is_prefix)
+
 subsection\<open>Greatest and Least\<close>
   lemma GreatestM_natI2:
     fixes m::"_\<Rightarrow>nat"
@@ -228,7 +270,7 @@ subsection\<open>Greatest and Least\<close>
       using assms diff_le_mono2 by fastforce
     show ?thesis unfolding LeastM_def GreatestM_def a..
   qed
-    
+  
   lemma Least_nat_Greatest:
     fixes m::"_\<Rightarrow>nat"
     assumes "\<forall>y. P y \<longrightarrow> m y < b"
@@ -246,7 +288,7 @@ subsection\<open>Greatest and Least\<close>
   
   definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
     (\<nexists>r'. r'\<noteq>w \<and> border r' w \<and> length r < length r')"
-
+  
   lemma ib'_ib: "w \<noteq> [] \<Longrightarrow> intrinsic_border' (intrinsic_border w) w"
   unfolding intrinsic_border_def intrinsic_border'_def
   apply (rule conjI)
@@ -283,11 +325,10 @@ subsection\<open>Greatest and Least\<close>
   lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
     by (metis intrinsic_border_less length_take less_not_refl2 min_less_iff_conj take_eq_Nil)
   
-  text\<open>"Intrinsic border length plus one (only useful for @{term "s \<noteq> []"})"\<close>
+  text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
     "iblp1 s 0 = 0"(*by definition*) |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
-  (*Todo: Properties. They will need j \<le> length s*)
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
     by (cases j) simp_all
@@ -351,25 +392,6 @@ subsection\<open>Algorithm\<close>
     apply auto
     done
   
-  lemmas nth_stuff = nth_take nth_take_lemma nth_equalityI
-  
-  (*Todo: swap names, add i+\<dots>, decide whether w instead of x and w is enough*)
-  lemma all_positions_drop_length_take: "\<lbrakk>i \<le> length w; i \<le> length x;
-    \<forall>j<i. x ! j = w ! (length w + j - i)\<rbrakk>
-      \<Longrightarrow> drop (length w - i) w = take i x"
-    by (cases "i = length x") (simp_all add: nth_equalityI)
-  
-  lemma all_positions_suffix_take: "\<lbrakk>i \<le> length w; i \<le> length x;
-    \<forall>j<i. x ! j = w ! (length w + j - i)\<rbrakk>
-      \<Longrightarrow> suffix (take i x) w"
-    by (metis all_positions_drop_length_take suffix_drop)
-  
-  thm suffix_drop take_is_prefix (* That naming -.- *)
-  
-  lemma border_take: "i \<le> length w \<Longrightarrow> \<forall>j<i. w!j = w!(length w - i + j)
-    \<Longrightarrow> border (take i w) w" unfolding border_def
-    by (metis all_positions_suffix_take add_diff_assoc2 take_is_prefix)
-  
   lemma reuse_matches: 
     assumes thi: "0<j" True "j<length s" "\<forall>j'<j. t ! (i + j') = s ! j'"
     shows "\<forall>j'<iblp1 s j - 1. t ! (i + (Suc j - iblp1 s j) + j') = s ! j'"
@@ -379,7 +401,7 @@ subsection\<open>Algorithm\<close>
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
     have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
       by (metis KMP.iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
-    from intrinsic_borderI[of "take j s"] border_positions[of "intrinsic_border (take j s)" "take j s", simplified]
+    from intrinsic_borderI[of "take j s", THEN conjunct2, THEN border_positions]
     have "\<forall>ja<length (intrinsic_border (take j s)). take j s ! ja = take j s ! (min (length s) j - length (intrinsic_border (take j s)) + ja)"
       by (metis List.list.size(3) length_take less_numeral_extra(3) min_simps(2) thi(1) thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - (iblp1 s j - 1) + ja)"
@@ -485,14 +507,14 @@ section\<open>Examples\<close>
     apply (auto simp: border_def)
     apply (smt list.inject prefix_Cons prefix_bot.bot.extremum_uniqueI)
     by (simp add: suffix_ConsI)
-
+  
   lemma ex3: "border a ''aab'' \<longleftrightarrow> a\<in>{
     '''',
     ''aab''
     }"
     apply (auto simp: border_def)
     using ex2 oops
-    
+  
   lemma ex7: "border a ''aabaaba'' \<longleftrightarrow> a\<in>{
     '''',
     ''a'',
@@ -500,7 +522,7 @@ section\<open>Examples\<close>
     ''aabaaba''}"
     apply (auto simp: border_def)
     oops
-    
+  
   lemma ex8: "border a ''aabaabaa'' \<longleftrightarrow> a\<in>{
     '''',
     ''a'',
@@ -508,7 +530,7 @@ section\<open>Examples\<close>
     ''aabaa'',
     ''aabaabaa''}"
     apply (auto simp: border_def) oops
-
+  
 end
   (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy. Arg_max is then available, too.*)
-  (*Define and use strict_border ?*=
+  (*Define and use strict_border ?*)
