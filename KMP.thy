@@ -4,13 +4,18 @@ theory KMP
 begin
 
   text\<open>Is this generalisation of @{thm nth_drop} useful?\<close>
-lemma nth_drop'[simp]: "n \<le> length xs \<Longrightarrow> drop n xs ! i = xs ! (n + i)"
-apply (induct n arbitrary: xs, auto)
- apply (case_tac xs, auto)
-done
-  (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
-thm nth_drop add_leD1[THEN nth_drop']
+  lemma nth_drop'[simp]: "n \<le> length xs \<Longrightarrow> drop n xs ! i = xs ! (n + i)"
+  apply (induct n arbitrary: xs, auto)
+   apply (case_tac xs, auto)
+  done
+    (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
+  thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
 
+section\<open>Isabelle 2017\<close>
+
+  text\<open>From theory @{theory Lattices_Big}:\<close>
+  definition is_arg_min :: "('a \<Rightarrow> 'b::ord) \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" where
+    "is_arg_min f P x = (P x \<and> \<not>(\<exists>y. P y \<and> f y < f x))"
   
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
@@ -442,8 +447,7 @@ subsection\<open>Algorithm\<close>
       with \<open>t!(i+j) \<noteq> s!j\<close> \<open>j<length s\<close> have ?thesis
         using substring_all_positions[of s t i] by auto
     } moreover {
-      (*assume bounds: "i'\<in>{i+1 .. i+j - iblp1 s j}"*)
-      assume bounds: "i<i'" "i'\<le>i+j-iblp1 s j"
+      assume bounds: "i<i'" "i'\<le>i+j-iblp1 s j" --\<open>The skipped positions.\<close>
       from this(1) \<open>i' < i + (Suc j - iblp1 s j)\<close> have "0<j" by linarith
       have important_and_start_and_end: "i + j - i' < length s"
         using assms(4) bounds(1) by linarith
@@ -486,12 +490,11 @@ subsection\<open>Algorithm\<close>
       by fastforce
   qed
   
-  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma kmp_correct: "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
       (*Todo: equivalent to \<not>sublist s t ?*)
     \<nexists>i. is_substring_at s t i
     | Some i \<Rightarrow>
-      (*Todo: equivalent to is_arg_max?*)
     is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding kmp_def I_outer_def I_inner_def
     apply (refine_vcg
@@ -509,6 +512,17 @@ subsection\<open>Algorithm\<close>
     subgoal for i jout j using i_increase[of s j _ i] by fastforce
     apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
+  
+  lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
+      | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i) =
+        (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
+      | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
+    unfolding is_arg_min_def by (auto split: option.split)
+  
+  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
+      | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i)"
+    unfolding alternate_form by (fact kmp_correct)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
 section\<open>Notes and Tests\<close>
