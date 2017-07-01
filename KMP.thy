@@ -3,6 +3,15 @@ theory KMP
     "~~/src/HOL/Library/Sublist"
 begin
 
+  text\<open>Is this generalisation of @{thm nth_drop} useful?\<close>
+lemma nth_drop'[simp]: "n \<le> length xs \<Longrightarrow> drop n xs ! i = xs ! (n + i)"
+apply (induct n arbitrary: xs, auto)
+ apply (case_tac xs, auto)
+done
+  (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
+thm nth_drop add_leD1[THEN nth_drop']
+
+  
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
   
@@ -327,7 +336,7 @@ subsection\<open>Greatest and Least\<close>
   
   text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-    "iblp1 s 0 = 0"(*by definition*) |
+    "iblp1 s 0 = 0" --\<open>Increment the compare position\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
@@ -377,7 +386,7 @@ subsection\<open>Algorithm\<close>
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
       if pos=None then do {
-        let i = i + (j + 1 - iblp1 s j);
+        let i = i + (j + 1 - iblp1 s j);(*ToDo: remove parentheses?*)
         let j = max 0 (iblp1 s j - 1); (*max not necessary*)
         RETURN (i,j,None)
       } else RETURN (i,j,Some i)
@@ -420,15 +429,19 @@ subsection\<open>Algorithm\<close>
       "\<forall>i'<i. \<not>is_substring_at s t i'"
       "t ! (i + j) \<noteq> s ! j"
       "i' < i + (Suc j - iblp1 s j)"
-      "i \<le> length t - length s"
-      "j < length s"
+      "i \<le> length t - length s" and
+      [simp]: "j < length s" and
       "\<forall>j'<j. t ! (i + j') = s ! j'"
-      "is_substring_at s t i'"
-    shows False
-      using assms oops
+    shows
+      "\<not>is_substring_at s t i'" oops
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
+    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
+      (*Todo: equivalent to sublist s t ?*)
+    \<nexists>i. is_substring_at s t i
+    | Some i \<Rightarrow>
+      (*Todo: equivalent to is_arg_max?*)
+    is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding kmp_def I_outer_def I_inner_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
