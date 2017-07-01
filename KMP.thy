@@ -371,7 +371,7 @@ subsection\<open>Invariants\<close>
     (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
     (case pos of None \<Rightarrow> (*j = 0*) (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
       | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
-  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos). jout \<le> j \<and>
+  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos).
     (case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
       | Some p \<Rightarrow> is_substring_at s t iout)"
   
@@ -431,9 +431,65 @@ subsection\<open>Algorithm\<close>
       "i' < i + (Suc j - iblp1 s j)"
       "i \<le> length t - length s" and
       [simp]: "j < length s" and
-      "\<forall>j'<j. t ! (i + j') = s ! j'"
+      old_matches: "\<forall>j'<j. t ! (i + j') = s ! j'"
     shows
-      "\<not>is_substring_at s t i'" oops
+      "\<not>is_substring_at s t i'"
+  proof -
+    {
+      assume "i'<i" --\<open>Old positions, use invariant.\<close>
+      with \<open>\<forall>i'<i. \<not>is_substring_at s t i'\<close> have ?thesis by simp
+    } moreover {
+      assume "i'=i" --\<open>The mismatch occurred while testing this alignment.\<close>
+      with \<open>t!(i+j) \<noteq> s!j\<close> \<open>j<length s\<close> have ?thesis
+        using substring_all_positions[of s t i] by auto
+    } moreover {
+      (*assume "i'\<in>{i+1 ..< i+(j+1) - iblp1 s j}"*)
+      assume bounds: "i<i'" "i'<i+(j+1)-iblp1 s j"
+      from this(1) \<open>i' < i + (Suc j - iblp1 s j)\<close> have "0<j" by linarith
+      have "i + j < length t"
+        using assms(1) assms(5) assms(6) by linarith
+      obtain diff where diff_def: "i+diff=i'"
+        by (meson add_diff_inverse_nat bounds(1) less_imp_le_nat not_less)
+      have important_and_start_and_end: "i + j - i' < length s"
+        using assms(6) bounds(1) by linarith
+      have "i + j - i' > iblp1 s j - 1"
+        by (smt Suc_diff Suc_leI Suc_lessI add_Suc_right add_diff_cancel_left' bounds(1) bounds(2) diff_Suc_Suc diff_diff_cancel diff_le_self diff_less diff_less_mono2 diff_zero dual_order.strict_trans iblp1_j0 le_add2 le_less_trans le_neq_implies_less le_numeral_extra(1) less_imp_diff_less less_imp_le_nat zero_less_diff zero_neq_one)
+      then have contradiction: "i + j - i' > length (intrinsic_border (take j s))"
+        by (metis (no_types, lifting) One_nat_def Suc_eq_plus1 \<open>0 < j\<close> add_less_cancel_right cancel_comm_monoid_add_class.diff_cancel iblp1.elims length_greater_0_conv less_diff_conv2 less_imp_le_nat list.size(3) nat_neq_iff)
+      have [simp]: "i + j - i' < j"
+        using \<open>0 < j\<close> bounds(1) by linarith
+      have ?thesis
+      proof
+        assume "is_substring_at s t i'"
+        note dings = substring_all_positions[OF this]
+        with important_and_start_and_end have a: "\<forall>jj < i+j-i'. t!(i'+jj) = s!jj"
+          by simp
+        from old_matches have "\<forall>jj < i+j-i'. t!(i'+jj) = s!(i'-i+jj)"
+          by (smt ab_semigroup_add_class.add.commute add.assoc add_diff_cancel_left' diff_def less_diff_conv)
+        then have "\<forall>jj < i+j-i'. s!jj = s!(i'-i+jj)"
+          using a by auto
+        then have "\<forall>jj < i+j-i'. (take j s)!jj = (take j s)!(i'-i+jj)"
+          using diff_def by auto
+        with positions_border[of "i+j-i'" "take j s", simplified]
+        have "border (take (i+j-i') s) (take j s)".
+        moreover have "take (i+j-i') s \<noteq> take j s"
+          by (metis \<open>i + j - i' < j\<close> assms(6) important_and_start_and_end length_take min_simps(2) nat_neq_iff)
+        ultimately have "take (i+j-i') s \<noteq> take j s \<and> border (take (i+j-i') s) (take j s)" by simp
+          note intrinsic_border_greatest[OF this]
+        moreover note contradiction
+        moreover have "i+j-i' \<le> length s"
+          using \<open>i + j - i' < j\<close> \<open>j < length s\<close> by linarith
+        ultimately
+        show False by simp
+      qed
+    } moreover {
+      assume "i'\<ge>i+(j+1 - iblp1 s j)" --\<open>Future positions, not part of the lemma.\<close>
+      with assms(4) have False by simp
+    }
+    --\<open>Combine the cases\<close>
+    ultimately show "\<not>is_substring_at s t i'"
+      by fastforce
+  qed
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
@@ -450,7 +506,7 @@ subsection\<open>Algorithm\<close>
     apply (vc_solve solve: asm_rl)
     subgoal for i jout j by (metis all_positions_substring less_SucE)
     using less_antisym apply blast
-    subgoal for i jout j i' sorry
+    subgoal for i jout j i' using shift_safe[of s t i j i'] by simp
     subgoal for i jout j
       apply (cases "j=0")
       apply (simp_all add: reuse_matches intrinsic_border_less''[simplified])
