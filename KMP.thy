@@ -350,7 +350,7 @@ subsection\<open>Greatest and Least\<close>
   lemma iblp1_le': "j > 0 \<Longrightarrow> s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - 1 < j"
     using iblp1_j0 iblp1_le by fastforce
   
-  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - 1 < length s"
+  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - Suc 0 < length s"
     by (cases j) (auto dest!: iblp1_le)
   
   lemma "p576 et seq":
@@ -369,9 +369,9 @@ subsection\<open>Greatest and Least\<close>
 subsection\<open>Invariants\<close>
   definition "I_outer t s \<equiv> \<lambda>(i,j,pos).
     (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
-    (case pos of None \<Rightarrow> (*j = 0*) (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
+    (case pos of None \<Rightarrow> (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
       | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
-  definition "I_inner t s iout jout \<equiv> \<lambda>(j,pos).
+  definition "I_inner t s iout \<equiv> \<lambda>(j,pos).
     (case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
       | Some p \<Rightarrow> is_substring_at s t iout)"
   
@@ -381,12 +381,12 @@ subsection\<open>Algorithm\<close>
     let j=0;
     let pos=None;
     (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (j,pos) \<leftarrow> WHILEIT (I_inner t s i j) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+      (j,pos) \<leftarrow> WHILEIT (I_inner t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
       if pos=None then do {
-        let i = i + (j + 1 - iblp1 s j);(*ToDo: remove parentheses?*)
+        let i = i + j + 1 - iblp1 s j;
         let j = max 0 (iblp1 s j - 1); (*max not necessary*)
         RETURN (i,j,None)
       } else RETURN (i,j,Some i)
@@ -403,10 +403,10 @@ subsection\<open>Algorithm\<close>
   
   lemma reuse_matches: 
     assumes thi: "0<j" True "j<length s" "\<forall>j'<j. t ! (i + j') = s ! j'"
-    shows "\<forall>j'<iblp1 s j - 1. t ! (i + (Suc j - iblp1 s j) + j') = s ! j'"
+    shows "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
   proof -
     from iblp1_le'[of j s] thi have "\<forall>j'<j. t ! (i + j') = s ! j'" by blast
-    with thi have 1: "\<forall>j'<iblp1 s j - 1. t ! (i + j - iblp1 s j + 1 + j') = s ! (j - iblp1 s j + 1 + j')"
+    with thi have 1: "\<forall>j'<iblp1 s j - 1. t ! (i + j + 1 - iblp1 s j + j') = s ! (j - iblp1 s j + 1 + j')"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
     have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
       by (metis KMP.iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
@@ -419,17 +419,16 @@ subsection\<open>Algorithm\<close>
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.comm_monoid_add_class.add.comm_neutral One_nat_def Suc_diff_eq_diff_pred add_Suc_right diff_add_assoc diff_is_0_eq' gr_implies_not_zero iblp1_le len_greater_imp_nonempty less_eq_Suc_le less_or_eq_imp_le not_le thi(3))
     with thi have 2: "\<forall>j'<iblp1 s j - 1. s ! (j - iblp1 s j + 1 + j') = s ! j'"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc iblp1_le iblp1_le' le_add_diff_inverse2 le_less_trans less_diff_conv less_imp_le_nat nat_add_left_cancel_less nth_take take_eq_Nil)
-    from 1 2 have "\<forall>j'<iblp1 s j - 1. t ! (i + (Suc j - iblp1 s j) + j') = s ! j'"
-      by (smt Groups.semigroup_add_class.add.assoc Suc_diff_le Suc_eq_plus1 add_diff_assoc iblp1_le len_greater_imp_nonempty less_imp_le_nat thi(3))
+    from 1 2 have "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
+      by (smt Nat.diff_add_assoc Suc_eq_plus1 ab_semigroup_add_class.add.commute ab_semigroup_add_class.add.left_commute iblp1_le len_greater_imp_nonempty less_or_eq_imp_le thi(3))
     then show ?thesis.
   qed
   
   lemma shift_safe:
-    assumes "length s \<le> length t"
+    assumes
       "\<forall>i'<i. \<not>is_substring_at s t i'"
       "t ! (i + j) \<noteq> s ! j"
-      "i' < i + (Suc j - iblp1 s j)"
-      "i \<le> length t - length s" and
+      "i' < i + (Suc j - iblp1 s j)" and
       [simp]: "j < length s" and
       old_matches: "\<forall>j'<j. t ! (i + j') = s ! j'"
     shows
@@ -443,15 +442,11 @@ subsection\<open>Algorithm\<close>
       with \<open>t!(i+j) \<noteq> s!j\<close> \<open>j<length s\<close> have ?thesis
         using substring_all_positions[of s t i] by auto
     } moreover {
-      (*assume "i'\<in>{i+1 ..< i+(j+1) - iblp1 s j}"*)
-      assume bounds: "i<i'" "i'<i+(j+1)-iblp1 s j"
+      (*assume bounds: "i'\<in>{i+1 .. i+j - iblp1 s j}"*)
+      assume bounds: "i<i'" "i'\<le>i+j-iblp1 s j"
       from this(1) \<open>i' < i + (Suc j - iblp1 s j)\<close> have "0<j" by linarith
-      have "i + j < length t"
-        using assms(1) assms(5) assms(6) by linarith
-      obtain diff where diff_def: "i+diff=i'"
-        by (meson add_diff_inverse_nat bounds(1) less_imp_le_nat not_less)
       have important_and_start_and_end: "i + j - i' < length s"
-        using assms(6) bounds(1) by linarith
+        using assms(4) bounds(1) by linarith
       have "i + j - i' > iblp1 s j - 1"
         by (smt Suc_diff Suc_leI Suc_lessI add_Suc_right add_diff_cancel_left' bounds(1) bounds(2) diff_Suc_Suc diff_diff_cancel diff_le_self diff_less diff_less_mono2 diff_zero dual_order.strict_trans iblp1_j0 le_add2 le_less_trans le_neq_implies_less le_numeral_extra(1) less_imp_diff_less less_imp_le_nat zero_less_diff zero_neq_one)
       then have contradiction: "i + j - i' > length (intrinsic_border (take j s))"
@@ -465,15 +460,15 @@ subsection\<open>Algorithm\<close>
         with important_and_start_and_end have a: "\<forall>jj < i+j-i'. t!(i'+jj) = s!jj"
           by simp
         from old_matches have "\<forall>jj < i+j-i'. t!(i'+jj) = s!(i'-i+jj)"
-          by (smt ab_semigroup_add_class.add.commute add.assoc add_diff_cancel_left' diff_def less_diff_conv)
+          by (smt Nat.add_diff_assoc2 ab_semigroup_add_class.add.commute add.assoc bounds(1) le_add2 less_diff_conv less_diff_conv2 less_or_eq_imp_le ordered_cancel_comm_monoid_diff_class.add_diff_inverse)
         then have "\<forall>jj < i+j-i'. s!jj = s!(i'-i+jj)"
           using a by auto
         then have "\<forall>jj < i+j-i'. (take j s)!jj = (take j s)!(i'-i+jj)"
-          using diff_def by auto
+          by (smt Nat.add_diff_assoc ab_semigroup_add_class.add.commute bounds(1) le_add2 le_less_trans less_diff_conv less_diff_conv2 less_or_eq_imp_le nth_take)
         with positions_border[of "i+j-i'" "take j s", simplified]
         have "border (take (i+j-i') s) (take j s)".
         moreover have "take (i+j-i') s \<noteq> take j s"
-          by (metis \<open>i + j - i' < j\<close> assms(6) important_and_start_and_end length_take min_simps(2) nat_neq_iff)
+          by (metis \<open>i + j - i' < j\<close> assms(4) important_and_start_and_end length_take min_simps(2) nat_neq_iff)
         ultimately have "take (i+j-i') s \<noteq> take j s \<and> border (take (i+j-i') s) (take j s)" by simp
           note intrinsic_border_greatest[OF this]
         moreover note contradiction
@@ -484,7 +479,7 @@ subsection\<open>Algorithm\<close>
       qed
     } moreover {
       assume "i'\<ge>i+(j+1 - iblp1 s j)" --\<open>Future positions, not part of the lemma.\<close>
-      with assms(4) have False by simp
+      with assms(3) have False by simp
     }
     --\<open>Combine the cases\<close>
     ultimately show "\<not>is_substring_at s t i'"
@@ -493,7 +488,7 @@ subsection\<open>Algorithm\<close>
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
-      (*Todo: equivalent to sublist s t ?*)
+      (*Todo: equivalent to \<not>sublist s t ?*)
     \<nexists>i. is_substring_at s t i
     | Some i \<Rightarrow>
       (*Todo: equivalent to is_arg_max?*)
@@ -506,12 +501,12 @@ subsection\<open>Algorithm\<close>
     apply (vc_solve solve: asm_rl)
     subgoal for i jout j by (metis all_positions_substring less_SucE)
     using less_antisym apply blast
-    subgoal for i jout j i' using shift_safe[of s t i j i'] by simp
+    subgoal for i jout j i' using shift_safe[of i s t j i'] by simp
     subgoal for i jout j
       apply (cases "j=0")
-      apply (simp_all add: reuse_matches intrinsic_border_less''[simplified])
+      apply (simp_all add: reuse_matches intrinsic_border_less'')
       done
-    subgoal for i _ j using i_increase[of s j _ i] by fastforce
+    subgoal for i jout j using i_increase[of s j _ i] by fastforce
     apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
 
@@ -548,7 +543,7 @@ section\<open>Notes and Tests\<close>
     apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
     apply auto
     done
-  
+  (*
 section\<open>Examples\<close>
   lemma test: "intrinsic_border [] [z]"
     unfolding intrinsic_border_def border_def by simp (meson list_se_match(4) suffixE)
@@ -599,7 +594,7 @@ section\<open>Examples\<close>
     ''aabaa'',
     ''aabaabaa''}"
     apply (auto simp: border_def) oops
-  
+  *)
 end
   (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy. Arg_max is then available, too.*)
   (*Define and use strict_border ?*)
