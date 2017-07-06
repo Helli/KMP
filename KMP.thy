@@ -376,17 +376,15 @@ subsection\<open>Invariants\<close>
     (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
     (case pos of None \<Rightarrow> (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
       | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
-  definition "I_inner t s iout \<equiv> \<lambda>(j,pos).
-    (case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
-      | Some p \<Rightarrow> is_substring_at s t iout)"
-  
+  text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
+
 subsection\<open>Algorithm\<close>
   definition "kmp t s \<equiv> do {
     let i=0;
     let j=0;
     let pos=None;
     (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (j,pos) \<leftarrow> WHILEIT (I_inner t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+      (j,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
@@ -460,7 +458,7 @@ subsection\<open>Algorithm\<close>
       have ?thesis
       proof
         assume "is_substring_at s t i'"
-        note dings = substring_all_positions[OF this]
+        note substring_all_positions[OF this]
         with important_and_start_and_end have a: "\<forall>jj < i+j-i'. t!(i'+jj) = s!jj"
           by simp
         from old_matches have "\<forall>jj < i+j-i'. t!(i'+jj) = s!(i'-i+jj)"
@@ -496,7 +494,7 @@ subsection\<open>Algorithm\<close>
     \<nexists>i. is_substring_at s t i
     | Some i \<Rightarrow>
     is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
-    unfolding kmp_def I_outer_def I_inner_def
+    unfolding kmp_def I_outer_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
@@ -524,7 +522,20 @@ subsection\<open>Algorithm\<close>
       | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i)"
     unfolding alternate_form by (fact kmp_correct)
 
-(*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)      
+(*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)
+subsection\<open>Computing @{const iblp1}\<close>
+  
+  lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
+    by (metis One_nat_def Suc_eq_plus1 add_diff_cancel_right' diff_is_0_eq iblp1.simps(2) iblp1_le length_ge_1_conv)
+  
+  lemma ib1[simp]: "intrinsic_border [z] = []"
+    by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
+  
+  lemma border_step: "border r w \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
+    apply (auto simp: border_def suffix_def)
+    using append_one_prefix prefixE apply fastforce
+    done
+
 section\<open>Notes and Tests\<close>
 
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
@@ -557,14 +568,8 @@ section\<open>Notes and Tests\<close>
     apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
     apply auto
     done
-  (*
+
 section\<open>Examples\<close>
-  lemma test: "intrinsic_border [] [z]"
-    unfolding intrinsic_border_def border_def by simp (meson list_se_match(4) suffixE)
-  
-  lemma test2: "(\<some>w. intrinsic_border w [z]) = []"
-    by (meson ib_unique someI test)
-  
   lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
     ''''
     }"
@@ -608,7 +613,7 @@ section\<open>Examples\<close>
     ''aabaa'',
     ''aabaabaa''}"
     apply (auto simp: border_def) oops
-  *)
+
 end
   (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy. Arg_max is then available, too.*)
   (*Define and use strict_border ?*)
