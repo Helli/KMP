@@ -16,7 +16,8 @@ section\<open>Isabelle 2017\<close>
   text\<open>From theory @{theory Lattices_Big}:\<close>
   definition is_arg_min :: "('a \<Rightarrow> 'b::ord) \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" where
     "is_arg_min f P x = (P x \<and> \<not>(\<exists>y. P y \<and> f y < f x))"
-  
+    \<comment>\<open>abbreviation if @{term \<open>f = id\<close>}?\<close>
+
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
   
@@ -522,7 +523,7 @@ subsection\<open>Algorithm\<close>
       | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i)"
     unfolding alternate_form by (fact kmp_correct)
 
-(*Todo: Algorithm for the set of all positions. Then: No break-flag needed.*)
+(*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 subsection\<open>Computing @{const iblp1}\<close>
   
   lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
@@ -535,7 +536,29 @@ subsection\<open>Computing @{const iblp1}\<close>
     apply (auto simp: border_def suffix_def)
     using append_one_prefix prefixE apply fastforce
     done
-
+  
+  term I_out_na
+  definition "I_out_cb s \<equiv> (\<lambda>(f::nat\<Rightarrow>nat,i::nat,j::nat). True)"
+  
+  definition "I_in_cb = undefined"
+  
+  definition "computeBorders s \<equiv> do {
+    let f=id;
+    let i=1;
+    let j=2;
+    (f,_,_) \<leftarrow> WHILEIT (I_out_cb s f i j) (\<lambda>(f,i,j). j\<le>length s) (\<lambda>(f,i,j). do {
+      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+        let i=f i;
+        RETURN i
+      }) i;
+      let i=i+1;
+      let f=f(j:=i);
+      RETURN (f,i,j)
+    }) (f,i,j);
+    
+    RETURN f
+  }"
+  
 section\<open>Notes and Tests\<close>
 
   term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
