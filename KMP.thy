@@ -3,6 +3,36 @@ theory KMP
     "~~/src/HOL/Library/Sublist"
 begin
 
+section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
+  sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
+  
+  definition array_upt :: "nat \<Rightarrow> nat \<Rightarrow> nat array Heap" where
+    "array_upt m n = Array.make (n-m) (\<lambda>i. i + m)"
+  
+  lemma map_plus_upt: "map (\<lambda>i. i + a) [0..<b - a] = [a..<b]"
+    by (induction b) (auto simp: map_add_upt)
+  
+  lemma array_upt_hnr_aux: "(uncurry array_upt, uncurry (RETURN oo op_list_upt)) \<in> nat_assn\<^sup>k *\<^sub>a nat_assn\<^sup>k \<rightarrow>\<^sub>a is_array"
+    by sepref_to_hoare (sep_auto simp: array_upt_def array_assn_def is_array_def map_plus_upt)
+  
+  lemma fold_array_assn_alt: "hr_comp is_array (\<langle>R\<rangle>list_rel) = array_assn (pure R)"
+    unfolding array_assn_def by auto
+  
+  context
+    notes [fcomp_norm_unfold] = fold_array_assn_alt
+  begin
+    sepref_decl_impl (no_register) array_upt: array_upt_hnr_aux.
+  end
+  
+  definition [simp]: "op_array_upt \<equiv> op_list_upt"
+  sepref_register op_array_upt
+  lemma array_fold_custom_upt:
+    "upt = op_array_upt"
+    "op_list_upt = op_array_upt"
+    "mop_list_upt = RETURN oo op_array_upt"
+    by (auto simp: op_array_upt_def intro!: ext)
+  lemmas array_upt_custom_hnr[sepref_fr_rules] = array_upt_hnr[unfolded array_fold_custom_upt]
+  
   text\<open>Is this generalisation of @{thm nth_drop} useful?\<close>
   lemma nth_drop'[simp]: "n \<le> length xs \<Longrightarrow> drop n xs ! i = xs ! (n + i)"
   apply (induct n arbitrary: xs, auto)
@@ -299,7 +329,7 @@ subsection\<open>Greatest and Least\<close>
   lemmas least_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for P m, folded LeastM_def, simplified]
   lemmas greatest_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for P m, folded GreatestM_def, no_vars]
   
-  definition "intrinsic_border w \<equiv> GREATEST r WRT length . r\<noteq>w \<and> border r w"   
+  definition "intrinsic_border w \<equiv> GREATEST r WRT length . r\<noteq>w \<and> border r w"
   
   definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
     (\<nexists>r'. r'\<noteq>w \<and> border r' w \<and> length r < length r')"
@@ -380,7 +410,10 @@ subsection\<open>Invariants\<close>
   text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
 
 subsection\<open>Algorithm\<close>
+    
+  text\<open>First, we use the non-evaluable function @{const "iblp1"} directly:}\<close>
   definition "kmp t s \<equiv> do {
+    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
     let i=0;
     let j=0;
     let pos=None;
@@ -390,6 +423,7 @@ subsection\<open>Algorithm\<close>
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
       if pos=None then do {
+        ASSERT (j < length s);
         let i = i + j + 1 - iblp1 s j;
         let j = max 0 (iblp1 s j - 1); (*max not necessary*)
         RETURN (i,j,None)
@@ -512,6 +546,122 @@ subsection\<open>Algorithm\<close>
     apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
   
+  text\<open>We refine the algorithm to compute the @{const iblp1} values only once at the start:\<close>
+  definition computeBordersSpec :: "'a list \<Rightarrow> nat list nres" where
+    "computeBordersSpec s \<equiv> ASSERT(s\<noteq>[]) \<then> SPEC (\<lambda>l. length l = length s \<and> (\<forall>i<length s. l!i = iblp1 s i))"
+    \<comment>\<open>@{term "i<length s"} is enough, as the @{const ASSERT}-statement right before the @{const iblp1}-usage shows.\<close>
+  
+  definition "kmp1 t s \<equiv> do {
+    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
+    let i=0;
+    let j=0;
+    let pos=None;
+    borders \<leftarrow> computeBordersSpec s;
+    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+        let j=j+1;
+        if j=length s then RETURN (j,Some i) else RETURN (j,None)
+      }) (j,pos);
+      if pos=None then do {
+        ASSERT (j < length borders);
+        let i = i + j + 1 - borders!j;
+        let j = max 0 (borders!j - 1); (*max not necessary*)
+        RETURN (i,j,None)
+      } else RETURN (i,j,Some i)
+    }) (i,j,pos);
+
+    RETURN pos
+  }"
+  
+  lemma "kmp1 t s \<le> kmp t s"
+    apply (rule refine_IdD)
+    unfolding kmp1_def kmp_def
+    unfolding Let_def computeBordersSpec_def nres_monad_laws
+    apply (intro ASSERT_refine_right ASSERT_refine_left)
+    apply simp
+    apply simp
+    apply (rule Refine_Basic.intro_spec_refine)
+    apply refine_rcg
+    apply refine_dref_type
+    apply vc_solve
+    done
+  
+  text\<open>Next, we give an algorithm that satisfies @{const computeBordersSpec}:\<close>
+  term I_out_na
+  definition "I_out_cb s \<equiv> undefined"
+  definition "I_in_cb = undefined"
+  definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
+    "computeBorders s = do {
+    ASSERT (s\<noteq>[]);
+    let b=[0..< length s];
+    let i=1;
+    let j=2;
+    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s b i j) (\<lambda>(b,i,j). j\<le>length s) (\<lambda>(b,i,j). do {
+      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+        ASSERT (i < length b);
+        i \<leftarrow> mop_list_get b i;
+        RETURN i
+      }) i;
+      let i=i+1;
+      ASSERT (i < length b);
+      b \<leftarrow> mop_list_set b j i;
+      RETURN (b,i,j)
+    }) (b,i,j);
+    
+    RETURN b
+  }"
+
+subsubsection\<open>Computing @{const iblp1}\<close>
+  lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
+    by (metis One_nat_def Suc_eq_plus1 add_diff_cancel_right' diff_is_0_eq iblp1.simps(2) iblp1_le length_ge_1_conv)
+  
+  lemma ib1[simp]: "intrinsic_border [z] = []"
+    by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
+  
+  lemma border_step: "border r w \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
+    apply (auto simp: border_def suffix_def)
+    using append_one_prefix prefixE apply fastforce
+    done
+  
+  lemma computeBorders_refine[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
+    unfolding computeBordersSpec_def computeBorders_def
+    apply simp
+    apply refine_vcg
+    sorry
+
+subsection\<open>Final refinement\<close>
+  text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
+  definition "kmp2 t s \<equiv> do {
+    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
+    let i=0;
+    let j=0;
+    let pos=None;
+    borders \<leftarrow> computeBorders s;
+    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+        let j=j+1;
+        if j=length s then RETURN (j,Some i) else RETURN (j,None)
+      }) (j,pos);
+      if pos=None then do {
+        ASSERT (j < length borders);
+        let i = i + j + 1 - borders!j;
+        let j = max 0 (borders!j - 1); (*max not necessary*)
+        RETURN (i,j,None)
+      } else RETURN (i,j,Some i)
+    }) (i,j,pos);
+
+    RETURN pos
+  }"
+  
+  text\<open>Using the @{thm computeBorders_refine}, the proof is trivial:\<close>
+  lemma "kmp2 t s \<le> kmp1 t s"
+    apply (rule refine_IdD)
+    unfolding kmp2_def kmp1_def
+    apply refine_rcg
+    apply refine_dref_type
+    apply vc_solve
+    done
+  
   lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
       | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i) =
         (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
@@ -524,25 +674,9 @@ subsection\<open>Algorithm\<close>
     unfolding alternate_form by (fact kmp_correct)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
-subsection\<open>Computing @{const iblp1}\<close>
-  
-  lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
-    by (metis One_nat_def Suc_eq_plus1 add_diff_cancel_right' diff_is_0_eq iblp1.simps(2) iblp1_le length_ge_1_conv)
-  
-  lemma ib1[simp]: "intrinsic_border [z] = []"
-    by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
-  
-  lemma border_step: "border r w \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
-    apply (auto simp: border_def suffix_def)
-    using append_one_prefix prefixE apply fastforce
-    done
-  
-  term I_out_na
-  definition "I_out_cb s \<equiv> (\<lambda>(f::nat\<Rightarrow>nat,i::nat,j::nat). True)"
-  
-  definition "I_in_cb = undefined"
-  
-  definition "computeBorders s \<equiv> do {
+subsection\<open>@{const computeBorders} using a function instead of a list\<close>
+  no_notation Ref.update ("_ := _" 62)
+  definition "computeBorders' s \<equiv> do {
     let f=id;
     let i=1;
     let j=2;
@@ -558,10 +692,8 @@ subsection\<open>Computing @{const iblp1}\<close>
     
     RETURN f
   }"
-  
-section\<open>Notes and Tests\<close>
 
-  term "SPEC (\<lambda>x::nat. x \<in> {4,7,9})"
+section\<open>Notes and Tests\<close>
   
   term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
   
