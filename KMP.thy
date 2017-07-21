@@ -458,7 +458,7 @@ subsection\<open>Algorithm\<close>
     with thi have 2: "\<forall>j'<iblp1 s j - 1. s ! (j - iblp1 s j + 1 + j') = s ! j'"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc iblp1_le iblp1_le' le_add_diff_inverse2 le_less_trans less_diff_conv less_imp_le_nat nat_add_left_cancel_less nth_take take_eq_Nil)
     from 1 2 have "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
-      by (smt Nat.diff_add_assoc Suc_eq_plus1 ab_semigroup_add_class.add.commute ab_semigroup_add_class.add.left_commute iblp1_le len_greater_imp_nonempty less_or_eq_imp_le thi(3))
+      using Suc_eq_plus1 by presburger
     then show ?thesis.
   qed
   
@@ -501,7 +501,7 @@ subsection\<open>Algorithm\<close>
         then have "\<forall>jj < i+j-i'. s!jj = s!(i'-i+jj)"
           using a by auto
         then have "\<forall>jj < i+j-i'. (take j s)!jj = (take j s)!(i'-i+jj)"
-          by (smt Nat.add_diff_assoc ab_semigroup_add_class.add.commute bounds(1) le_add2 le_less_trans less_diff_conv less_diff_conv2 less_or_eq_imp_le nth_take)
+          using bounds(1) by auto
         with positions_border[of "i+j-i'" "take j s", simplified]
         have "border (take (i+j-i') s) (take j s)".
         moreover have "take (i+j-i') s \<noteq> take j s"
