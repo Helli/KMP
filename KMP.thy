@@ -41,7 +41,7 @@ section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<clo
     (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
   thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
 
-section\<open>Isabelle 2017\<close>
+section\<open>Isabelle2017\<close>
 
   text\<open>From theory @{theory Lattices_Big}:\<close>
   definition is_arg_min :: "('a \<Rightarrow> 'b::ord) \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" where
@@ -142,6 +142,7 @@ section\<open>Definition "substring"\<close>
     apply (auto simp: slice_char_aux)
     done
   
+  text\<open>In the style of @{theory Sublist} (compare @{const prefix}, @{const suffix} etc.):\<close>
   lemma substring_altdef: "is_substring_at s t i \<longleftrightarrow> (\<exists>xs ys. xs@s@ys = t \<and> length xs = i)"
   proof (induction s t i rule: is_substring_at.induct)
     case (2 ss t ts i)
@@ -169,7 +170,7 @@ subsection\<open>Basic form\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
     \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at s t i')
     \<or> found \<and> is_substring_at s t i"
-  definition "I_in_na t s iout (*KMP should need jout, too*) \<equiv> \<lambda>(j,found).
+  definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
     \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
     \<or> found \<and> j = length s \<and> is_substring_at s t iout"
   
@@ -179,6 +180,7 @@ subsection\<open>Basic form\<close>
     let found=False;
     (_,_,found) \<leftarrow> WHILEIT (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
       (j,found) \<leftarrow> WHILEIT (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
+        (*ToDo: maybe instead of \<not>found directly query j<length s ?*)
         let j=j+1;
         if j=length s then RETURN (j,True) else RETURN (j,False)
       }) (j,found);
@@ -372,7 +374,7 @@ subsection\<open>Greatest and Least\<close>
   
   text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-    "iblp1 s 0 = 0" --\<open>Increment the compare position\<close> |
+    "iblp1 s 0 = 0" --\<open>This increments the compare position\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
@@ -410,7 +412,6 @@ subsection\<open>Invariants\<close>
   text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
 
 subsection\<open>Algorithm\<close>
-    
   text\<open>First, we use the non-evaluable function @{const "iblp1"} directly:}\<close>
   definition "kmp t s \<equiv> do {
     ASSERT (s \<noteq> [] \<and> length s \<le> length t);
@@ -501,7 +502,7 @@ subsection\<open>Algorithm\<close>
         then have "\<forall>jj < i+j-i'. s!jj = s!(i'-i+jj)"
           using a by auto
         then have "\<forall>jj < i+j-i'. (take j s)!jj = (take j s)!(i'-i+jj)"
-          using bounds(1) by auto
+          using \<open>i<i'\<close> by auto
         with positions_border[of "i+j-i'" "take j s", simplified]
         have "border (take (i+j-i') s) (take j s)".
         moreover have "take (i+j-i') s \<noteq> take j s"
@@ -546,7 +547,7 @@ subsection\<open>Algorithm\<close>
     apply (auto split: option.split intro: leI le_less_trans substring_i)[]
     done
   
-  text\<open>We refine the algorithm to compute the @{const iblp1} values only once at the start:\<close>
+  text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
   definition computeBordersSpec :: "'a list \<Rightarrow> nat list nres" where
     "computeBordersSpec s \<equiv> ASSERT(s\<noteq>[]) \<then> SPEC (\<lambda>l. length l = length s \<and> (\<forall>i<length s. l!i = iblp1 s i))"
     \<comment>\<open>@{term "i<length s"} is enough, as the @{const ASSERT}-statement right before the @{const iblp1}-usage shows.\<close>
@@ -587,6 +588,7 @@ subsection\<open>Algorithm\<close>
     done
   
   text\<open>Next, we give an algorithm that satisfies @{const computeBordersSpec}:\<close>
+subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
   definition "I_out_cb s \<equiv> undefined"
   definition "I_in_cb = undefined"
@@ -598,6 +600,9 @@ subsection\<open>Algorithm\<close>
     let j=2;
     (b,_,_) \<leftarrow> WHILEIT (I_out_cb s b i j) (\<lambda>(b,i,j). j\<le>length s) (\<lambda>(b,i,j). do {
       i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      (*Obacht, the \<and> must use short-circuit evaluation
+      (otherwise the - actually needs cut-off arithmetic).
+      Maybe rewrite beforehand to avoid this?*)
         ASSERT (i < length b);
         i \<leftarrow> mop_list_get b i;
         RETURN i
@@ -610,8 +615,7 @@ subsection\<open>Algorithm\<close>
     
     RETURN b
   }"
-
-subsubsection\<open>Computing @{const iblp1}\<close>
+  
   lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
     by (metis One_nat_def Suc_eq_plus1 add_diff_cancel_right' diff_is_0_eq iblp1.simps(2) iblp1_le length_ge_1_conv)
   
@@ -653,7 +657,7 @@ subsection\<open>Final refinement\<close>
     RETURN pos
   }"
   
-  text\<open>Using the @{thm computeBorders_refine}, the proof is trivial:\<close>
+  text\<open>Using @{thm [source] computeBorders_refine} (it has @{attribute refine}), the proof is trivial:\<close>
   lemma "kmp2 t s \<le> kmp1 t s"
     apply (rule refine_IdD)
     unfolding kmp2_def kmp1_def
@@ -677,6 +681,7 @@ subsection\<open>Final refinement\<close>
 subsection\<open>@{const computeBorders} using a function instead of a list\<close>
   no_notation Ref.update ("_ := _" 62)
   definition "computeBorders' s \<equiv> do {
+    (*Todo: Assertions*)
     let f=id;
     let i=1;
     let j=2;
