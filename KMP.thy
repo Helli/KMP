@@ -75,48 +75,38 @@ section\<open>Definition "substring"\<close>
     by (induction s t i rule: is_substring_at.induct) auto
   
   text\<open>However, the new definition has some reasonable properties:\<close>
-  lemma substring_length_s: "is_substring_at s t i \<Longrightarrow> length s \<le> length t"
+  lemma substring_lengths: "is_substring_at s t i \<Longrightarrow> i + length s \<le> length t"
     apply (induction s t i rule: is_substring_at.induct)
     apply simp_all
     done
   
-  lemma substring_i: "is_substring_at s t i \<Longrightarrow> i \<le> length t - length s"
-    apply (induction s t i rule: is_substring_at.induct)
-    apply (auto simp add: Suc_diff_le substring_length_s)
-    done
+  lemma Nil_is_substring: "i \<le> length t \<longleftrightarrow> is_substring_at ([] :: 'y list) t i"
+    by (induction "[] :: 'y list" t i rule: is_substring_at.induct) auto
   
   text\<open>Furthermore, we need:\<close>
-  
   lemma substring_step:
-    "\<lbrakk>length s + i < length t; is_substring_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at (s@[x]) t i"
+    "\<lbrakk>i + length s < length t; is_substring_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at (s@[x]) t i"
     apply (induction s t i rule: is_substring_at.induct)
     apply auto
     using is_substring_at.elims(3) by fastforce
   
-  lemma Nil_is_substring: "i \<le> length t \<Longrightarrow> is_substring_at [] t i"
-    apply (induction t arbitrary: i)
-    apply auto
-    using is_substring_at.elims(3) by force
-  
   lemma all_positions_substring:
-  "\<lbrakk>length s \<le> length t; i \<le> length t - length s; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at s t i"
+  "\<lbrakk>i + length s \<le> length t; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at s t i"
   proof (induction s rule: rev_induct)
     case Nil
     then show ?case by (simp add: Nil_is_substring)
   next
     case (snoc x xs)
-    from \<open>length (xs @ [x]) \<le> length t\<close> have "length xs \<le> length t" by simp
-    moreover have "i \<le> length t - length xs"
-      using snoc.prems(2) by auto
+    from \<open>i + length (xs @ [x]) \<le> length t\<close> have "i + length xs \<le> length t" by simp
     moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
-      by (metis le_refl length_append less_le_trans nth_append snoc.prems(3) trans_le_add1)
+      by (simp add: nth_append snoc.prems(2))
     ultimately have f: "is_substring_at xs t i"
-      using snoc.IH by blast
+      using snoc.IH by simp
     show ?case
       apply (rule substring_step)
       using snoc.prems(1) snoc.prems(2) apply auto[]
       apply (fact f)
-      by (simp add: snoc.prems(3))
+      by (simp add: snoc.prems(2))
   qed
   
   lemma substring_all_positions:
@@ -131,7 +121,7 @@ section\<open>Definition "substring"\<close>
   | "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
   | "slice _ _ _ = []"  
   
-  lemma slice_char_aux: "is_substring_at s t 0 \<longleftrightarrow> s = KMP.slice t 0 (length s)"
+  lemma slice_char_aux: "is_substring_at s t 0 \<longleftrightarrow> s = slice t 0 (length s)"
     apply (induction t arbitrary: s)
     subgoal for s by (cases s) auto  
     subgoal for _ _ s by (cases s) auto  
@@ -178,7 +168,7 @@ subsection\<open>Basic form\<close>
     let i=0;
     let j=0;
     let found=False;
-    (_,_,found) \<leftarrow> WHILEIT (I_out_na t s) (\<lambda>(i,j,found). i\<le>length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
+    (_,_,found) \<leftarrow> WHILEIT (I_out_na t s) (\<lambda>(i,j,found). i \<le> length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
       (j,found) \<leftarrow> WHILEIT (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
         (*ToDo: maybe instead of \<not>found directly query j<length s ?*)
         let j=j+1;
@@ -202,13 +192,13 @@ subsection\<open>Basic form\<close>
           WHILEIT_rule[where R="measure (\<lambda>(j,_::bool). length s - j)"]
           ) 
     apply (vc_solve solve: asm_rl)
-    subgoal apply (metis all_positions_substring less_SucE) done
+    subgoal by (metis Nat.le_diff_conv2 all_positions_substring less_SucE)
     subgoal using less_Suc_eq apply blast done
     subgoal by (metis less_SucE substring_all_positions)
-    subgoal by (meson leI le_less_trans substring_i)
+    subgoal by (meson le_diff_conv2 leI order_trans substring_lengths)
     done
   
-  text\<open>These preconditions cannot be removed: If @{term \<open>s = []\<close>} (or @{term \<open>t = []\<close>}), the inner while-condition will access out-of-bound memory. The same can happen if @{term \<open>length t < length s\<close>} (I guess this one could be narrowed down to something like "if t is a proper prefix of s", but that's a bit pointless).\<close>
+  text\<open>The first precondition cannot be removed without an extra branch: If @{term \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{term \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{term \<open>i \<le> length t - length s\<close>} in the first while-condition to @{term \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
   
 subsection\<open>A variant returning the position\<close>
   definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
@@ -223,7 +213,7 @@ subsection\<open>A variant returning the position\<close>
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEIT (I_out_nap t s) (\<lambda>(i,_,pos). i\<le>length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_out_nap t s) (\<lambda>(i,_,pos). i + length s \<le>length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (_,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
@@ -238,7 +228,7 @@ subsection\<open>A variant returning the position\<close>
     RETURN pos
   }"
   
-  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma "s \<noteq> []
     \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
     apply (refine_vcg
@@ -246,10 +236,11 @@ subsection\<open>A variant returning the position\<close>
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
       )
     apply (vc_solve solve: asm_rl)
-    apply (metis all_positions_substring less_antisym)
-    using less_Suc_eq apply blast
-    apply (metis less_SucE substring_all_positions)
-    by (auto split: option.split intro: leI le_less_trans substring_i)
+    subgoal by (metis add_Suc_right all_positions_substring less_antisym)
+    subgoal using less_Suc_eq by blast
+    subgoal by (metis less_SucE substring_all_positions)
+    subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
+    done
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
@@ -374,7 +365,7 @@ subsection\<open>Greatest and Least\<close>
   
   text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-    "iblp1 s 0 = 0" --\<open>This increments the compare position\<close> |
+    "iblp1 s 0 = 0" \<comment>\<open>This increments the compare position\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
@@ -414,11 +405,11 @@ subsection\<open>Invariants\<close>
 subsection\<open>Algorithm\<close>
   text\<open>First, we use the non-evaluable function @{const "iblp1"} directly:}\<close>
   definition "kmp t s \<equiv> do {
-    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
+    ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (j,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
@@ -448,7 +439,7 @@ subsection\<open>Algorithm\<close>
     with thi have 1: "\<forall>j'<iblp1 s j - 1. t ! (i + j + 1 - iblp1 s j + j') = s ! (j - iblp1 s j + 1 + j')"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
     have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
-      by (metis KMP.iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
+      by (metis iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
     from intrinsic_borderI[of "take j s", THEN conjunct2, THEN border_positions]
     have "\<forall>ja<length (intrinsic_border (take j s)). take j s ! ja = take j s ! (min (length s) j - length (intrinsic_border (take j s)) + ja)"
       by (metis List.list.size(3) length_take less_numeral_extra(3) min_simps(2) thi(1) thi(3))
@@ -524,7 +515,7 @@ subsection\<open>Algorithm\<close>
       by fastforce
   qed
   
-  lemma kmp_correct: "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma kmp_correct: "s \<noteq> []
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
       (*Todo: equivalent to \<not>sublist s t ?*)
     \<nexists>i. is_substring_at s t i
@@ -536,15 +527,15 @@ subsection\<open>Algorithm\<close>
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
       )
     apply (vc_solve solve: asm_rl)
-    subgoal for i jout j by (metis all_positions_substring less_SucE)
-    using less_antisym apply blast
+    subgoal for i jout j by (metis add_Suc_right all_positions_substring less_antisym)
+    subgoal using less_antisym by blast
     subgoal for i jout j i' using shift_safe[of i s t j i'] by simp
     subgoal for i jout j
       apply (cases "j=0")
       apply (simp_all add: reuse_matches intrinsic_border_less'')
       done
     subgoal for i jout j using i_increase[of s j _ i] by fastforce
-    apply (auto split: option.split intro: leI le_less_trans substring_i)[]
+    subgoal by (auto split: option.splits) (metis substring_length_s add_less_cancel_right leI le_less_trans)
     done
   
   text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
@@ -553,12 +544,12 @@ subsection\<open>Algorithm\<close>
     \<comment>\<open>@{term "i<length s"} is enough, as the @{const ASSERT}-statement right before the @{const iblp1}-usage shows.\<close>
   
   definition "kmp1 t s \<equiv> do {
-    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
+    ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
     let pos=None;
     borders \<leftarrow> computeBordersSpec s;
-    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
@@ -636,12 +627,12 @@ subsubsection\<open>Computing @{const iblp1}\<close>
 subsection\<open>Final refinement\<close>
   text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
   definition "kmp2 t s \<equiv> do {
-    ASSERT (s \<noteq> [] \<and> length s \<le> length t);
+    ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
     let pos=None;
     borders \<leftarrow> computeBorders s;
-    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i \<le> length t - length s \<and> pos=None) (\<lambda>(i,j,pos). do {
+    (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
@@ -672,7 +663,7 @@ subsection\<open>Final refinement\<close>
       | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
     unfolding is_arg_min_def by (auto split: option.split)
   
-  lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+  lemma "s \<noteq> []
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
       | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i)"
     unfolding alternate_form by (fact kmp_correct)
