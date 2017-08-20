@@ -156,6 +156,8 @@ section\<open>Definition "substring"\<close>
   (*Todo: fifth alternative: inductive is_substring_at*)
 
 section\<open>Naive algorithm\<close>
+  
+  text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
     \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at s t i')
@@ -535,7 +537,7 @@ subsection\<open>Algorithm\<close>
       apply (simp_all add: reuse_matches intrinsic_border_less'')
       done
     subgoal for i jout j using i_increase[of s j _ i] by fastforce
-    subgoal by (auto split: option.splits) (metis substring_length_s add_less_cancel_right leI le_less_trans)
+    subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
     done
   
   text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
