@@ -367,33 +367,54 @@ subsection\<open>Greatest and Least\<close>
   
   text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-    "iblp1 s 0 = 0" \<comment>\<open>This increments the compare position\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
+    --\<open>Todo: Better name, replace +1 with Suc\<close>
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
     by (cases j) simp_all
   
-  lemma iblp1_le: "s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j \<le> j"
-    apply (cases j)
-     apply simp_all
-    by (metis (no_types, lifting) Suc_le_eq Suc_neq_Zero intrinsic_border_less leI length_take less_irrefl_nat less_le_trans min.absorb2 take_eq_Nil)
+  lemma iblp1_le:
+    assumes "s \<noteq> []"
+    shows "iblp1 s j \<le> j"
+  proof-\<comment>\<open>It looks like @{method cases}, but it isn't.\<close>
+    { 
+      assume "j \<ge> length s"
+      with \<open>s \<noteq> []\<close> have "iblp1 s j = iblp1 s (length s)"
+        by (metis iblp1.elims le_zero_eq list_exhaust_size_eq0 order_mono_setup.refl take_all)
+    } moreover {
+      fix j
+      assume "j \<le> length s"
+      then have "iblp1 s j \<le> j"
+        apply (cases j)
+        apply simp_all
+        by (metis eq_imp_le eq_refl intrinsic_border_less len_greater_imp_nonempty length_take linear min.absorb2 nat_in_between_eq(2))
+    }
+    ultimately show ?thesis
+      by (metis dual_order.trans linear)
+  qed
   
-  lemma iblp1_le': "j > 0 \<Longrightarrow> s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - 1 < j"
-    using iblp1_j0 iblp1_le by fastforce
+  lemma iblp1_le': "j > 0 \<Longrightarrow> s \<noteq> [] \<Longrightarrow> iblp1 s j - 1 < j"
+  proof -
+    assume "s \<noteq> []"
+    then have "iblp1 s j \<le> j" by (fact iblp1_le)
+    moreover assume "j > 0"
+    ultimately show ?thesis
+      by linarith
+  qed
   
-  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - Suc 0 < length s"
-    by (cases j) (auto dest!: iblp1_le)
+  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> iblp1 s j - Suc 0 < length s"
+    by (cases j) (simp_all add: intrinsic_border_less')
   
   lemma "p576 et seq":
     assumes
-      "s \<noteq> []" "j \<le> length s" and
+      "s \<noteq> []" and
       assignments:
       "i' = i + (j + 1 - iblp1 s j)"
       "j' = max 0 (iblp1 s j - 1)"
     shows
       sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed? (≙Sinn von S.576?)*) and
       i_increase: "i' > i"
-    using assignments by (auto simp: iblp1_le[OF assms(1-2), THEN le_imp_less_Suc])
+    using assignments by (simp_all add: iblp1_le[OF assms(1), THEN le_imp_less_Suc])
   
   thm longest_common_prefix
 
@@ -434,21 +455,21 @@ subsection\<open>Algorithm\<close>
     done
   
   lemma reuse_matches: 
-    assumes thi: "0<j" True "j<length s" "\<forall>j'<j. t ! (i + j') = s ! j'"
+    assumes thi: "0<j" True "j\<le>length s" "\<forall>j'<j. t ! (i + j') = s ! j'"
     shows "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
   proof -
-    from iblp1_le'[of j s] thi have "\<forall>j'<j. t ! (i + j') = s ! j'" by blast
+    from iblp1_le'[of j s] thi(1,4) have "\<forall>j'<j. t ! (i + j') = s ! j'" by blast
     with thi have 1: "\<forall>j'<iblp1 s j - 1. t ! (i + j + 1 - iblp1 s j + j') = s ! (j - iblp1 s j + 1 + j')"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
     have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
       by (metis iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
     from intrinsic_borderI[of "take j s", THEN conjunct2, THEN border_positions]
     have "\<forall>ja<length (intrinsic_border (take j s)). take j s ! ja = take j s ! (min (length s) j - length (intrinsic_border (take j s)) + ja)"
-      by (metis List.list.size(3) length_take less_numeral_extra(3) min_simps(2) thi(1) thi(3))
+      by (metis length_take less_numeral_extra(3) list.size(3) min.absorb2 thi(1) thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - (iblp1 s j - 1) + ja)"
-      by (simp add: thi(3) meh)
+      by (simp add: meh min.absorb2 thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - iblp1 s j + 1 + ja)"
-      by (smt Groups.ab_semigroup_add_class.add.commute Groups.comm_monoid_add_class.add.comm_neutral One_nat_def Suc_diff_eq_diff_pred add_Suc_right diff_add_assoc diff_is_0_eq' gr_implies_not_zero iblp1_le len_greater_imp_nonempty less_eq_Suc_le less_or_eq_imp_le not_le thi(3))
+      by (metis One_nat_def Suc_n_minus_m_eq add.right_neutral add_Suc_right iblp1_le le_zero_eq len_greater_imp_nonempty length_greater_0_conv list.size(3) meh thi(1) thi(3) zero_less_diff)
     with thi have 2: "\<forall>j'<iblp1 s j - 1. s ! (j - iblp1 s j + 1 + j') = s ! j'"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc iblp1_le iblp1_le' le_add_diff_inverse2 le_less_trans less_diff_conv less_imp_le_nat nat_add_left_cancel_less nth_take take_eq_Nil)
     from 1 2 have "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
@@ -536,7 +557,7 @@ subsection\<open>Algorithm\<close>
       apply (cases "j=0")
       apply (simp_all add: reuse_matches intrinsic_border_less'')
       done
-    subgoal for i jout j using i_increase[of s j _ i] by fastforce
+    subgoal for i jout j using i_increase[of s _ i j] by fastforce
     subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
     done
   
@@ -580,18 +601,20 @@ subsection\<open>Algorithm\<close>
     apply vc_solve
     done
   
-  text\<open>Next, we give an algorithm that satisfies @{const computeBordersSpec}:\<close>
+  text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
-  definition "I_out_cb s \<equiv> undefined"
+  definition "I_out_cb s \<equiv> \<lambda>(b,i,j). length b = length s \<and> (\<forall>jj<j. b!jj = iblp1 s jj)"
+  (*Assertion from p. 582?*)
   definition "I_in_cb = undefined"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     ASSERT (s\<noteq>[]);
-    let b=[0..< length s];
-    let i=1;
-    let j=2;
-    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s b i j) (\<lambda>(b,i,j). j\<le>length s) (\<lambda>(b,i,j). do {
+    let b=[0 ..< length s];(*No longer necessary \<longrightarrow> replace with zeroes?*)
+    let i=0;
+    let j=1;
+    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length s) (\<lambda>(b,i,j). do {
+      (*Assertion from p. 582?*)
       i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
       (*Obacht, the \<and> must use short-circuit evaluation
       (otherwise the - actually needs cut-off arithmetic).
@@ -603,6 +626,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       let i=i+1;
       ASSERT (i < length b);
       b \<leftarrow> mop_list_set b j i;
+      let j=j+1;
       RETURN (b,i,j)
     }) (b,i,j);
     
@@ -610,7 +634,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   }"
   
   lemma iblp1_1[simp]: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
-    by (metis One_nat_def Suc_eq_plus1 add_diff_cancel_right' diff_is_0_eq iblp1.simps(2) iblp1_le length_ge_1_conv)
+    by (metis One_nat_def Suc_lessI add_gr_0 iblp1.simps(2) iblp1_le leD zero_less_one)
   
   lemma ib1[simp]: "intrinsic_border [z] = []"
     by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
@@ -621,10 +645,32 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     done
   
   lemma computeBorders_refine[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
-    unfolding computeBordersSpec_def computeBorders_def
+    unfolding computeBordersSpec_def computeBorders_def I_out_cb_def
     apply simp
-    apply refine_vcg
-    sorry
+    apply (refine_vcg
+      WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s - j)"]
+      WHILEIT_rule[where R="measure (\<lambda>(i::nat). i)" (*replace with id? remove?*)]
+      )
+    apply (vc_solve solve: asm_rl)
+    proof goal_cases
+      case (1 ab aaa baa)
+      then show ?case sorry
+    next
+      case (2 b j i)
+      then show ?case sorry
+    next
+      case (3 ab baa sa)
+      then show ?case sorry
+    next
+      case (4 ab baa sa)
+      then show ?case sorry
+    next
+      case (5 ab baa sa)
+      then show ?case sorry
+    next
+      case (6 ab baa sa jj)
+      then show ?case sorry
+    qed
 
 subsection\<open>Final refinement\<close>
   text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
@@ -672,6 +718,7 @@ subsection\<open>Final refinement\<close>
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 subsection\<open>@{const computeBorders} using a function instead of a list\<close>
+  (*
   no_notation Ref.update ("_ := _" 62)
   definition "computeBorders' s \<equiv> do {
     (*Todo: Assertions*)
@@ -690,7 +737,7 @@ subsection\<open>@{const computeBorders} using a function instead of a list\<clo
     
     RETURN f
   }"
-
+  *)
 section\<open>Notes and Tests\<close>
   
   term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
