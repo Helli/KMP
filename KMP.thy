@@ -367,6 +367,7 @@ subsection\<open>Greatest and Least\<close>
   
   text\<open>"Intrinsic border length plus one" for prefixes\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
+    "iblp1 s 0 = 0"\<comment>\<open>This increments the compare position while \<^term>\<open>j=0\<close>\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
     --\<open>Todo: Better name, replace +1 with Suc\<close>
   
