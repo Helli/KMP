@@ -47,6 +47,9 @@ section\<open>Isabelle2017\<close>
   definition is_arg_min :: "('a \<Rightarrow> 'b::ord) \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" where
     "is_arg_min f P x = (P x \<and> \<not>(\<exists>y. P y \<and> f y < f x))"
     \<comment>\<open>abbreviation if @{term \<open>f = id\<close>}?\<close>
+  text\<open>Is this useful?\<close>
+  lemma "\<exists>x. P x \<Longrightarrow> is_arg_min id P (Min {x. P x})"
+    oops
 
 section\<open>Definition "substring"\<close>
   definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
@@ -605,9 +608,12 @@ subsection\<open>Algorithm\<close>
   text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
-  definition "I_out_cb s \<equiv> \<lambda>(b,i,j). length b = length s \<and> (\<forall>jj<j. b!jj = iblp1 s jj)"
-  (*Assertion from p. 582?*)
-  definition "I_in_cb = undefined"
+  definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
+    length b = length s \<and>
+    (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
+    i = b!(j-1) \<and>
+    0 < j"(*needed?*)
+  definition "I_in_cb s bout jout \<equiv> \<lambda>i. i < jout"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     ASSERT (s\<noteq>[]);
@@ -615,8 +621,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     let i=0;
     let j=1;
     (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length s) (\<lambda>(b,i,j). do {
-      (*Assertion from p. 582?*)
-      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      i \<leftarrow> WHILEIT (I_in_cb s b j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
       (*Obacht, the \<and> must use short-circuit evaluation
       (otherwise the - actually needs cut-off arithmetic).
       Maybe rewrite beforehand to avoid this?*)
@@ -645,31 +650,50 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     using append_one_prefix prefixE apply fastforce
     done
   
+  lemma loop_exit: (*or \<dots>_induct ?*)
+    assumes
+      "i < j"
+      "i = 0 \<or> s ! (i - Suc 0) = s ! (j - Suc 0)"
+      "j < length s"
+      "length b = length s"
+      "\<forall>jj<j. b ! jj = iblp1 s jj"
+    shows
+      "b ! j(*replace lhs*) = iblp1 s j"
+      oops
+  
+  lemma "i < length s \<Longrightarrow> iblp1 s i = i \<Longrightarrow> \<exists>a. take i s = replicate i a"
+    (*apply (induction s i rule: above)*)
+    oops
+  
   lemma computeBorders_refine[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
-    unfolding computeBordersSpec_def computeBorders_def I_out_cb_def
+    unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
     apply simp
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s - j)"]
-      WHILEIT_rule[where R="measure (\<lambda>(i::nat). i)" (*replace with id? remove?*)]
+      WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
       )
     apply (vc_solve solve: asm_rl)
     proof goal_cases
-      case (1 ab aaa baa)
-      then show ?case sorry
+      case (1 b j)
+      then show ?case
+        by (metis One_nat_def diff_less dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv less_numeral_extra(1))
     next
       case (2 b j i)
-      then show ?case sorry
+      then show ?case
+        by (metis dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv)
     next
-      case (3 ab baa sa)
-      then show ?case sorry
+      case (3 b j i)
+      with iblp1_le[of s' i] have "iblp1 s' i \<le> i"
+        using len_greater_imp_nonempty by simp
+      moreover {
+        assume "iblp1 s' i = i"
+        then have "s'!(i-1) = s'!(j-1)" sorry
+        with "3"(6) have False by simp
+      }
+      ultimately show ?case
+        using nat_less_le by blast
     next
-      case (4 ab baa sa)
-      then show ?case sorry
-    next
-      case (5 ab baa sa)
-      then show ?case sorry
-    next
-      case (6 ab baa sa jj)
+      case (4 b j i jj')
       then show ?case sorry
     qed
 
