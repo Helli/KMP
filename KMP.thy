@@ -252,6 +252,12 @@ subsection\<open>Auxiliary definitions\<close>
   text\<open>Borders of words\<close>
   definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
   
+  interpretation border_order: order border "\<lambda>r w. border r w \<and> r \<noteq> w"
+    by (standard, auto simp: border_def suffix_def)
+  interpretation border_bot: order_bot Nil border "\<lambda>r w. border r w \<and> r \<noteq> w"
+    by standard (simp add: border_def)
+  (*Above interpretations useful? Or provide @{prop "border [] w"} {prop "border w w"} directly?*)
+  
   lemma substring_unique: "\<lbrakk>is_substring_at s t i; is_substring_at s' t i; length s = length s'\<rbrakk> \<Longrightarrow> s = s'"
     by (metis nth_equalityI substring_all_positions)
   
@@ -263,9 +269,6 @@ subsection\<open>Auxiliary definitions\<close>
   
   lemma border_lengths_differ: "\<lbrakk>border r w; border r' w; r\<noteq>r'\<rbrakk> \<Longrightarrow> length r \<noteq> length r'"
     using border_unique by auto
-  
-  lemma Nil_is_border[simp]: "border [] w"
-    unfolding border_def by simp
   
   lemma border_length_r_less: "\<forall>r. r \<noteq> w \<and> border r w \<longrightarrow> length r < length w"
     unfolding border_def using not_equal_is_parallel prefix_length_le by fastforce
@@ -288,12 +291,8 @@ subsection\<open>Auxiliary definitions\<close>
   
   thm suffix_drop take_is_prefix (* That naming -.- *)
   
-  lemma border_take: "i \<le> length w \<Longrightarrow> \<forall>j<i. w!j = w!(length w - i + j)
-    \<Longrightarrow> border (take i w) w" unfolding border_def
-    by (metis all_positions_suffix_take add_diff_assoc2 take_is_prefix)
-  
   lemma positions_border: "\<forall>j<i. w!j = w!(length w - i + j) \<Longrightarrow> border (take i w) w"
-    by (metis border_def border_take less_imp_le_nat not_le suffix_refl take_all take_is_prefix)
+    by (cases "i < length w") (simp_all add: border_def all_positions_suffix_take take_is_prefix)
 
 subsection\<open>Greatest and Least\<close>
   lemma GreatestM_natI2:
@@ -354,7 +353,7 @@ subsection\<open>Greatest and Least\<close>
     unfolding intrinsic_border_def Let_def
     thm GreatestM_natI[of _ "[]"]
     apply (rule GreatestM_natI[of _ "[]"])
-    using Nil_is_border apply blast
+    using border_bot.bot_least apply blast
     using border_length_r_less apply auto
       done
   
@@ -451,7 +450,7 @@ subsection\<open>Algorithm\<close>
 
     RETURN pos
   }"
-        
+  
   lemma substring_substring:
     "\<lbrakk>is_substring_at s1 t i; is_substring_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> is_substring_at (s1@s2) t i"
     apply (induction s1 t i rule: is_substring_at.induct)
@@ -645,10 +644,57 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   lemma ib1[simp]: "intrinsic_border [z] = []"
     by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
   
-  lemma border_step: "border r w \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
+  lemma border_butlast: "border r w \<Longrightarrow> border (butlast r) (butlast w)"
+    apply (auto simp: border_def)
+     apply (metis butlast_append prefixE prefix_order.eq_refl prefix_prefix prefixeq_butlast)
+    apply (metis Sublist.suffix_def append.right_neutral butlast.simps(1) butlast_append)
+    done
+  
+  lemma border_step: "border r w \<longleftrightarrow> border (r@[w!length r]) (w@[w!length r])"
     apply (auto simp: border_def suffix_def)
     using append_one_prefix prefixE apply fastforce
+    using append_prefixD apply blast
     done
+  
+  lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
+    using border_step intrinsic_borderI by force
+  
+  lemma intrinsic_border_step': "w \<noteq> [] \<Longrightarrow>  border (intrinsic_border w @[w!length (intrinsic_border w)]) (w@[w!length (intrinsic_border w)])"
+    using border_step intrinsic_borderI by force
+  
+  lemma sus: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border (w@[w!length (intrinsic_border w)])) \<le> length (intrinsic_border w) + 1"
+    using "needed?"[unfolded Let_def, of w] "needed?"[unfolded Let_def, of "w@[w!length (intrinsic_border w)]"] sorry
+  
+  lemma intrinsic_border_step'':
+    assumes
+      "w \<noteq> []"
+      "intrinsic_border w = r"
+    shows
+      "intrinsic_border (w@[w!length r]) = (r@[w!length r])"
+  proof-
+    {
+      assume "length (intrinsic_border (w @ [w ! length r])) > length r + 1"
+      then have "length (intrinsic_border w) > length r"
+        by (metis assms leD sus)
+      with \<open>intrinsic_border w = r\<close> have False by simp
+    }
+    then show ?thesis
+    proof -
+      have f1: "\<forall>as. ([]::'a list) = as \<or> intrinsic_border as \<noteq> as \<and> border (intrinsic_border as) as"
+        by (meson intrinsic_borderI)
+      have f2: "1 = length [w ! length r]"
+        by (metis One_nat_def length_Cons list.size(3))
+      have "intrinsic_border w \<noteq> w \<and> border (intrinsic_border w) w"
+        using f1 by (metis assms(1))
+      then have "r @ [w ! length r] \<noteq> w @ [w ! length r]"
+        using assms(2) by blast
+      then show ?thesis
+        using f2 f1 by (metis (no_types) Nil_is_append_conv \<open>length r + 1 < length (intrinsic_border (w @ [w ! length r])) \<Longrightarrow> False\<close> assms(1) assms(2) border_lengths_differ dual_order.strict_iff_order intrinsic_border_greatest intrinsic_border_step length_append)
+    qed
+  qed
+  text "s border[j−1] = s j−1 , so ist border[j] = border[j − 1] + 1"
+    
+  lemma rule: "\<lbrakk>A \<Longrightarrow> P; \<not>A \<and> B \<Longrightarrow> P\<rbrakk> \<Longrightarrow> A \<or> B \<Longrightarrow> P" by auto
   
   lemma loop_exit: (*or \<dots>_induct ?*)
     assumes
@@ -658,8 +704,8 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       "length b = length s"
       "\<forall>jj<j. b ! jj = iblp1 s jj"
     shows
-      "b ! j(*replace lhs*) = iblp1 s j"
-      oops
+      "iblp1 s j = Suc i"
+  oops
   
   lemma "i < length s \<Longrightarrow> iblp1 s i = i \<Longrightarrow> \<exists>a. take i s = replicate i a"
     (*apply (induction s i rule: above)*)
