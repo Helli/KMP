@@ -167,10 +167,10 @@ section\<open>Naive algorithm\<close>
   text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
-    \<not>found \<and> j = 0 \<and> (\<forall>i' < i. \<not>is_substring_at s t i')
+    \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>is_substring_at s t i')
     \<or> found \<and> is_substring_at s t i"
   definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
-    \<not>found \<and> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
+    \<not>found \<and> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
     \<or> found \<and> j = length s \<and> is_substring_at s t iout"
   
   definition "na t s \<equiv> do {
@@ -211,11 +211,11 @@ subsection\<open>Basic form\<close>
   
 subsection\<open>A variant returning the position\<close>
   definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
-    (\<forall>i' < i. \<not>is_substring_at s t i') \<and>
+    (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
     (case pos of None \<Rightarrow> j = 0
       | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
   definition "I_in_nap t s iout \<equiv> \<lambda>(j,pos).
-    case pos of None \<Rightarrow> j < length s \<and> (\<forall>j' < j. t!(iout+j') = s!(j'))
+    case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
       | Some p \<Rightarrow> is_substring_at s t iout"
 
   definition "nap t s \<equiv> do {
