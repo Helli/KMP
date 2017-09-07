@@ -143,20 +143,20 @@ section\<open>Definition "substring"\<close>
   lemma substring_altdef: "is_substring_at s t i \<longleftrightarrow> (\<exists>xs ys. xs@s@ys = t \<and> length xs = i)"
   proof (induction s t i rule: is_substring_at.induct)
     case (2 ss t ts i)
-    show "is_substring_at ss (t # ts) (Suc i) \<longleftrightarrow> (\<exists>xs ys. xs @ ss @ ys = t # ts \<and> length xs = Suc i)"
+    show "is_substring_at ss (t#ts) (Suc i) \<longleftrightarrow> (\<exists>xs ys. xs@ss@ys = t#ts \<and> length xs = Suc i)"
       (is "?lhs \<longleftrightarrow> ?rhs")
     proof
       assume ?lhs
       then have "is_substring_at ss ts i" by simp
-      with "2.IH" obtain xs where "\<exists>ys. ts = xs @ ss @ ys \<and> i = length xs" by auto
-      then have "\<exists>ys. (t#xs) @ ss @ ys = t # ts \<and> length (t#xs) = Suc i" by auto
+      with "2.IH" obtain xs where "\<exists>ys. ts = xs@ss@ys \<and> i = length xs" by auto
+      then have "\<exists>ys. (t#xs)@ss@ys = t#ts \<and> length (t#xs) = Suc i" by auto
       then show ?rhs by blast
     next
       assume ?rhs
-      then obtain xs where "\<exists>ys. xs @ ss @ ys = t # ts \<and> length xs = Suc i" by blast
-      then have "\<exists>ys. (tl xs) @ ss @ ys = ts \<and> length (tl xs) = i"
+      then obtain xs where "\<exists>ys. xs@ss@ys = t#ts \<and> length xs = Suc i" by blast
+      then have "\<exists>ys. (tl xs)@ss@ys = ts \<and> length (tl xs) = i"
         by (metis Suc_length_conv len_greater_imp_nonempty list.sel(3) tl_append2 zero_less_Suc)
-      then have "\<exists>xs ys. xs @ ss @ ys = ts \<and> length xs = i" by blast
+      then have "\<exists>xs ys. xs@ss@ys = ts \<and> length xs = i" by blast
       with "2.IH" show ?lhs by simp
     qed
   qed auto
