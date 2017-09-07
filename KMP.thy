@@ -255,7 +255,7 @@ section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
   text\<open>Borders of words\<close>
   definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
-  definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> xs \<noteq> ys"(*Useful? Strg+F?*)
+  definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> xs \<noteq> ys"(*Try altdef here?*)
   
   interpretation border_order: order border strict_border
     by (standard, auto simp: border_def suffix_def strict_border_def)
@@ -284,6 +284,9 @@ subsection\<open>Auxiliary definitions\<close>
   
   lemma border_length_r_less: "\<forall>r. strict_border r w \<longrightarrow> length r < length w"
     using border_length_less by auto
+  
+  lemma strict_border_altdef: "strict_border r w \<longleftrightarrow> border r w \<and> length r < length w"
+    using border_length_r_less border_order.le_less by blast
   
   lemma border_positions: "border r w \<Longrightarrow> \<forall>j<length r. w!j = w!(length w - length r + j)" unfolding border_def
     by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
@@ -365,6 +368,7 @@ subsection\<open>Greatest and Least\<close>
     by (simp add: border_length_r_less intrinsic_border'_def strict_border_def)
   
   lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_border w) w"
+    (*equivalent to intrinsic_borderI'*)
     unfolding intrinsic_border_def
     thm GreatestM_natI[of _ "[]"]
     apply (rule GreatestM_natI[of _ "[]"])
@@ -629,8 +633,10 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     length b = length s \<and>
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
     i = b!(j-1) \<and>
-    0 < j"(*needed?*)
-  definition "I_in_cb s bout jout \<equiv> \<lambda>i. i < jout"
+    i < j"(*needed?*)
+  definition "I_in_cb s bout jout \<equiv> \<lambda>i.
+    i < jout \<and> (*needed?*)
+    iblp1 s jout \<le> Suc i"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     ASSERT (s\<noteq>[]);
@@ -647,7 +653,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
         RETURN i
       }) i;
       let i=i+1;
-      ASSERT (i < length b);
+      ASSERT (j < length b);
       b \<leftarrow> mop_list_set b j i;
       let j=j+1;
       RETURN (b,i,j)
@@ -668,6 +674,9 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     apply (metis Sublist.suffix_def append.right_neutral butlast.simps(1) butlast_append)
     done
   
+  corollary strict_border_butlast: "r \<noteq> [] \<Longrightarrow> strict_border r w \<Longrightarrow> strict_border (butlast r) (butlast w)"
+    unfolding strict_border_altdef by (auto simp: border_butlast less_diff_conv)
+  
   lemma border_step: "border r w \<longleftrightarrow> border (r@[w!length r]) (w@[w!length r])"
     apply (auto simp: border_def suffix_def)
     using append_one_prefix prefixE apply fastforce
@@ -680,8 +689,27 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   lemma intrinsic_border_step': "w \<noteq> [] \<Longrightarrow>  border (intrinsic_border w @[w!length (intrinsic_border w)]) (w@[w!length (intrinsic_border w)])"
     using intrinsic_border_step by blast
   
+  lemma ib_butlast[intro]: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
+  proof -
+    assume "length w \<ge> 2"
+    then have "w \<noteq> []" by auto
+    then have "strict_border (intrinsic_border w) w"
+      by (fact intrinsic_borderI')
+    with \<open>2 \<le> length w\<close> have "strict_border (butlast (intrinsic_border w)) (butlast w)"
+      by (metis One_nat_def butlast.simps(1) diff_is_0_eq le_simps(3) length_0_conv length_butlast not_less numeral_2_eq_2 sigh strict_border_butlast)
+    then have "length (butlast (intrinsic_border w)) \<le> length (intrinsic_border (butlast w))"
+      using intrinsic_border_greatest by blast
+    then show ?thesis
+      by simp
+  qed
+  
+  corollary iblp1_Suc: "i < length w \<Longrightarrow> iblp1 w (Suc i) \<le> Suc (iblp1 w i)"
+    apply (cases i)
+     apply (simp_all add: take_Suc0)
+      by (metis Suc_eq_plus1 Suc_leI Suc_le_mono Suc_neq_Zero Suc_to_right ib_butlast le_less_linear length_take less_Suc0 min.absorb2 numerals(2) take_minus_one_conv_butlast)
+  
   lemma sus: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border (w@[w!length (intrinsic_border w)])) \<le> length (intrinsic_border w) + 1"
-    sorry
+    oops
   
   lemma intrinsic_border_step'':
     assumes
@@ -693,7 +721,12 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     {
       assume "length (intrinsic_border (w @ [w ! length r])) > length r + 1"
       then have "length (intrinsic_border w) > length r"
-        by (metis assms leD sus)
+      proof -
+        have "\<not> length (intrinsic_border (w @ [w ! length r])) \<le> length r + 1"
+          by (metis \<open>length r + 1 < length (intrinsic_border (w @ [w ! length r]))\<close> leD)
+        then show ?thesis
+          by (metis (no_types) Suc_leI assms(1) assms(2) butlast_snoc ib_butlast length_Cons length_append length_greater_0_conv less_add_same_cancel2 list.size(3) numeral_2_eq_2)
+      qed
       with \<open>intrinsic_border w = r\<close> have False by simp
     }
     then show ?thesis
@@ -732,6 +765,11 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     (*apply (induction s i rule: above)*)
     oops
   
+  thm border_positions
+  corollary intrinsic_border_positions: "length (intrinsic_border w) = l
+    \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
+    by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
+  
   lemma computeBorders_refine[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
     unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
     apply simp
@@ -740,29 +778,31 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
       )
     apply (vc_solve solve: asm_rl)
-    proof goal_cases
-      case (1 b j)
-      then show ?case
-        by (metis One_nat_def diff_less dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv less_numeral_extra(1))
-    next
-      case (2 b j i)
-      then show ?case
-        by (metis dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv)
-    next
-      case (3 b j i)
-      with iblp1_le[of s' i] have "iblp1 s' i \<le> i"
-        using len_greater_imp_nonempty by simp
-      moreover {
-        assume "iblp1 s' i = i"
-        then have "s'!(i-1) = s'!(j-1)" sorry
-        with "3"(6) have False by simp
+    subgoal by (metis diff_less lessE less_Suc_eq_0_disj)
+    subgoal by (metis Suc_diff_Suc gr_implies_not0 iblp1_Suc less_or_eq_imp_le linorder_neqE_nat minus_nat.diff_0 nz_le_conv_less)
+    subgoal by (metis dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv)
+    subgoal for b j i
+      proof goal_cases
+        case 1
+            {
+        assume y: "iblp1 s' j > Suc (iblp1 s' i)"
+        then obtain jj where yo: "iblp1 s' j = Suc jj" and "jj \<ge> Suc (iblp1 s' i)"
+          using Suc_lessE by auto
+        then obtain ii  where [simp]: "j = Suc ii"
+          by (metis "1"(4) "1"(6) Suc_pred dual_order.strict_trans)
+        note yo[simplified]
+        note intrinsic_border_positions[OF this, simplified]
+        then have yo': "\<forall>j<jj. s'!j = s'!(Suc ii - jj + j)"
+          by (smt "1"(2) "1"(4) "1"(6) One_nat_def Suc_to_right \<open>j = Suc ii\<close> add_diff_cancel_left' iblp1_le' less_diff_conv list.size(3) min_less_iff_conj min_pm1 min_simps(2) nat_neq_iff nth_take yo)
+        with 1 have "s'!(i - 1) = s'!(j - 1)"
+          sorry
       }
-      ultimately show ?case
-        using nat_less_le by blast
-    next
-      case (4 b j i jj')
-      then show ?case sorry
+      then show ?case
+        by (metis "1"(7) One_nat_def le_less_linear)
     qed
+    subgoal sorry
+    subgoal sorry
+    done
 
 subsection\<open>Final refinement\<close>
   text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
