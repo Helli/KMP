@@ -70,11 +70,17 @@ section\<open>Definition "substring"\<close>
     t2: "is_substring_at ss (t#ts) (Suc i) \<longleftrightarrow> is_substring_at ss ts i" |
     "is_substring_at [] t 0 \<longleftrightarrow> True" |
     "is_substring_at _ [] _ \<longleftrightarrow> False"
-
+  
+  export_code is_substring_at(*fails*)
+  
   lemmas [code del] = t1 t2
-    
-  lemma [code]: "is_substring_at ss (t#ts) i \<longleftrightarrow> (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at (tl ss) ts 0 else is_substring_at ss ts (i-1))"  
-    by (cases ss; cases i; auto)
+  lemma [code]:
+    "is_substring_at ss (t#ts) i \<longleftrightarrow>
+      (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at (tl ss) ts 0 else is_substring_at ss ts (i-1))"  
+    "is_substring_at ss [] i \<longleftrightarrow> ss=[] \<and> i=0"
+    by (cases ss; cases i; auto)+
+  
+  export_code is_substring_at(*works*)
   
   text\<open>For all relevant cases, both definitions agree:\<close>
   lemma "i \<le> length t \<Longrightarrow> is_substring_at s t i \<longleftrightarrow> is_substring_at' s t i"
