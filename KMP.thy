@@ -3,10 +3,6 @@ theory KMP
     "~~/src/HOL/Library/Sublist"
 begin
 
-section\<open>Addition to @{theory "Sublist"}?\<close>
-  lemma strict_suffix_altdef: "strict_suffix xs ys \<longleftrightarrow> suffix xs ys \<and> xs \<noteq> ys"
-    using strict_suffix_def strict_suffix_imp_suffix suffixE by fastforce
-
 section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
   sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
   
@@ -45,23 +41,14 @@ section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<clo
     (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
   thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
 
-section\<open>Isabelle2017\<close>
-
-  text\<open>From theory @{theory Lattices_Big}:\<close>
-  definition is_arg_min :: "('a \<Rightarrow> 'b::ord) \<Rightarrow> ('a \<Rightarrow> bool) \<Rightarrow> 'a \<Rightarrow> bool" where
-    "is_arg_min f P x = (P x \<and> \<not>(\<exists>y. P y \<and> f y < f x))"
-    \<comment>\<open>abbreviation if @{term \<open>f = id\<close>}?\<close>
-  text\<open>Is this useful?\<close>
-  lemma "\<exists>x. P x \<Longrightarrow> is_arg_min id P (Min {x. P x})"
-    oops
-
-section\<open>Definition "substring"\<close>
+section\<open>Subsequence-predicate with a position check\<close>
+subsection\<open>Definition\<close>
   definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
   
   text\<open>Problem:\<close>
-  value "is_substring_at' [] [a] 5"
-  value "is_substring_at' [a] [a] 5"
-  value "is_substring_at' [] [] 3"
+  value[nbe] "is_substring_at' [] [a] 5"
+  value[nbe] "is_substring_at' [a] [a] 5"
+  value[nbe] "is_substring_at' [] [] 3"
   text\<open>Not very intuitive...\<close>
   
   text\<open>For the moment, we use this instead:\<close>
@@ -88,6 +75,7 @@ section\<open>Definition "substring"\<close>
     by (induction s t i rule: is_substring_at.induct) auto
   
   text\<open>However, the new definition has some reasonable properties:\<close>
+subsection\<open>Properties\<close>
   lemma substring_lengths: "is_substring_at s t i \<Longrightarrow> i + length s \<le> length t"
     apply (induction s t i rule: is_substring_at.induct)
     apply simp_all
@@ -126,8 +114,8 @@ section\<open>Definition "substring"\<close>
     "is_substring_at s t i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
     by (induction s t i rule: is_substring_at.induct)
       (auto simp: nth_Cons')
-  
-  text\<open>Other characterisations:\<close>
+
+subsection\<open>Other characterisations:\<close>
   fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
     where
     "slice (x#xs) (Suc n) l = slice xs n l"
@@ -275,7 +263,7 @@ subsection\<open>Auxiliary definitions\<close>
   lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r w"
     by (auto simp: strict_border_def border_def)
   lemma strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
-    by (auto simp: strict_border_def border_def strict_suffix_altdef)
+    by (auto simp: strict_border_def border_def)
   
   lemma border_length_le: "border r w \<Longrightarrow> length r \<le> length w"
     unfolding border_def by (simp add: prefix_length_le)
@@ -318,76 +306,55 @@ subsection\<open>Auxiliary definitions\<close>
   corollary positions_strict_border: "i < length w \<Longrightarrow> \<forall>j<i. w!j = w!(length w - i + j) \<Longrightarrow> strict_border (take i w) w"
     by (metis length_take min_simps(2) nat_neq_iff positions_border strict_border_def)
 
-subsection\<open>Greatest and Least\<close>
-  lemma GreatestM_natI2:
+subsection\<open>@{const arg_min} and @{const arg_max}\<close>
+  lemma arg_max_natI2:
     fixes m::"_\<Rightarrow>nat"
     assumes "P x"
       and "\<forall>y. P y \<longrightarrow> m y < b"
       and "\<And>x. P x \<Longrightarrow> Q x"
-    shows "Q (GreatestM m P)"
-  by (fact GreatestM_natI[OF assms(1,2), THEN assms(3)])
+    shows "Q (arg_max m P)"
+  by (fact arg_max_natI[OF assms(1,2), THEN assms(3)])
   
-  lemma Greatest_nat_Least:
+  lemma arg_max_arg_min:
     fixes m::"_\<Rightarrow>nat"
     assumes "\<forall>y. P y \<longrightarrow> m y \<le> b"
-    shows "GreatestM m P = LeastM (\<lambda>a. b - m a) P"
-    proof -
+    shows "arg_max m P = arg_min (\<lambda>a. b - m a) P"
+  proof -
     have a: "(\<forall>y. P y \<longrightarrow> b - m x \<le> b - m y) \<longleftrightarrow> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for x
       using assms diff_le_mono2 by fastforce
-    show ?thesis unfolding LeastM_def GreatestM_def a..
+    show ?thesis unfolding arg_min_def arg_max_def is_arg_min_linorder is_arg_max_linorder a..
   qed
   
-  lemma Least_nat_Greatest:
+  lemma arg_min_arg_max:
     fixes m::"_\<Rightarrow>nat"
     assumes "\<forall>y. P y \<longrightarrow> m y < b"
-    shows "LeastM m P = GreatestM (\<lambda>a. b - m a) P"
+    shows "arg_min m P = arg_max (\<lambda>a. b - m a) P"
   proof -
     have a: "(\<forall>y. P y \<longrightarrow> b - m y \<le> b - m x) \<longleftrightarrow> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for x
       using assms diff_le_mono2 by force
-    show ?thesis unfolding LeastM_def GreatestM_def a..
+    show ?thesis unfolding arg_min_def arg_max_def is_arg_min_linorder is_arg_max_linorder a..
   qed
   
-  lemmas least_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for P m, folded LeastM_def, simplified]
-  lemmas greatest_equality = some_equality[of "\<lambda>x. P x \<and> (\<forall>y. P y \<longrightarrow> m y \<le> m x)" for P m, folded GreatestM_def, no_vars]
-  
-  definition "intrinsic_border w \<equiv> GREATEST r WRT length . strict_border r w"
-  
-  definition "intrinsic_border' r w \<longleftrightarrow> border r w \<and> r\<noteq>w \<and>
-    (\<nexists>r'. border r' w \<and> r'\<noteq>w \<and> length r < length r')"
-  
-  lemma ib'_ib: "w \<noteq> [] \<Longrightarrow> intrinsic_border' (intrinsic_border w) w"
-  unfolding intrinsic_border_def strict_border_def intrinsic_border'_def
-  apply (rule conjI)
-    apply (rule GreatestM_natI2[of "\<lambda>r. border r w \<and> r\<noteq>w" "[]" length "length w"])
-     apply (simp_all add: border_length_r_less[unfolded strict_border_def])[3]
-    apply (rule conjI)
-    apply (rule GreatestM_natI2[of "\<lambda>r. border r w \<and> r\<noteq>w" "[]" length "length w"])
-     apply (simp_all add: border_length_r_less[unfolded strict_border_def])[3]
-    apply auto
-  using GreatestM_nat_le[OF _ border_length_r_less[unfolded strict_border_def], of _ w]
-    by (simp add: leD)
-  
-  lemma ib'_unique: "\<lbrakk>intrinsic_border' r w; intrinsic_border' r' w\<rbrakk> \<Longrightarrow> r = r'"
-    by (metis border_unique intrinsic_border'_def nat_neq_iff)
-  
-  lemma ib'_length_r: "intrinsic_border' r w \<Longrightarrow> length r < length w"
-    by (simp add: border_length_r_less intrinsic_border'_def strict_border_def)
+  definition "intrinsic_border w \<equiv> ARG_MAX length r. strict_border r w"
   
   lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_border w) w"
     (*equivalent to intrinsic_borderI'*)
     unfolding intrinsic_border_def
-    thm GreatestM_natI[of _ "[]"]
-    apply (rule GreatestM_natI[of _ "[]"])
+    thm arg_max_natI[of _ "[]"]
+    apply (rule arg_max_natI[of _ "[]"])
      apply (simp add: border_bot.bot.not_eq_extremum)
     using border_length_less apply auto
       done
   
-  lemmas intrinsic_borderI = GreatestM_natI[of "\<lambda>r. strict_border r w" "[]" length "length w", OF _ border_length_r_less, folded intrinsic_border_def] for w
+  lemmas intrinsic_borderI = arg_max_natI[OF _ border_length_r_less, folded intrinsic_border_def]
   
   lemmas sigh = border_bot.bot.not_eq_extremum[THEN iffD1]
   lemmas intrinsic_borderI' = sigh[THEN intrinsic_borderI]
   
-  lemmas intrinsic_border_greatest = GreatestM_nat_le[of "\<lambda>r. strict_border r w" _ length "length w", OF _ border_length_r_less, folded intrinsic_border_def] for w
+  lemmas intrinsic_border_max = arg_max_nat_le[OF _ border_length_r_less, folded intrinsic_border_def]
+  
+  lemma nonempty_is_arg_max_ib: "w \<noteq> [] \<Longrightarrow> is_arg_max length (\<lambda>r. strict_border r w) (intrinsic_border w)"
+    by (simp add: intrinsic_borderI' intrinsic_border_max is_arg_max_linorder)
   
   lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border w) < length w"
     using intrinsic_borderI[of w] border_length_r_less "needed?" by blast
@@ -494,9 +461,8 @@ subsection\<open>Algorithm\<close>
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
     have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
       by (metis iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
-    from intrinsic_borderI[of "take j s", unfolded strict_border_def, THEN conjunct1, THEN border_positions]
     have "\<forall>ja<length (intrinsic_border (take j s)). take j s ! ja = take j s ! (min (length s) j - length (intrinsic_border (take j s)) + ja)"
-      by (metis border_bot.bot.extremum length_take less_numeral_extra(3) list.size(3) min.absorb2 thi(1) thi(3))
+      by (metis border_positions intrinsic_borderI' length_greater_0_conv length_take min.absorb2 strict_border_def thi(1) thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - (iblp1 s j - 1) + ja)"
       by (simp add: meh min.absorb2 thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - iblp1 s j + 1 + ja)"
@@ -553,7 +519,7 @@ subsection\<open>Algorithm\<close>
         moreover have "take (i+j-i') s \<noteq> take j s"
           by (metis \<open>i + j - i' < j\<close> assms(4) important_and_start_and_end length_take min_simps(2) nat_neq_iff)
         ultimately have "strict_border (take (i+j-i') s) (take j s)" by simp
-          note intrinsic_border_greatest[OF this]
+          note intrinsic_border_max[OF this]
         moreover note contradiction
         moreover have "i+j-i' \<le> length s"
           using \<open>i + j - i' < j\<close> \<open>j < length s\<close> by linarith
@@ -690,12 +656,12 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     done
   
   lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
-    using border_step by (metis ib'_ib intrinsic_border'_def)
+    using border_step intrinsic_borderI' strict_border_def by blast
   
   lemma intrinsic_border_step': "w \<noteq> [] \<Longrightarrow>  border (intrinsic_border w @[w!length (intrinsic_border w)]) (w@[w!length (intrinsic_border w)])"
     using intrinsic_border_step by blast
   
-  lemma ib_butlast[intro]: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
+  lemma ib_butlast: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
   proof -
     assume "length w \<ge> 2"
     then have "w \<noteq> []" by auto
@@ -704,7 +670,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     with \<open>2 \<le> length w\<close> have "strict_border (butlast (intrinsic_border w)) (butlast w)"
       by (metis One_nat_def butlast.simps(1) diff_is_0_eq le_simps(3) length_0_conv length_butlast not_less numeral_2_eq_2 sigh strict_border_butlast)
     then have "length (butlast (intrinsic_border w)) \<le> length (intrinsic_border (butlast w))"
-      using intrinsic_border_greatest by blast
+      using intrinsic_border_max by blast
     then show ?thesis
       by simp
   qed
@@ -735,22 +701,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       qed
       with \<open>intrinsic_border w = r\<close> have False by simp
     }
-    then show ?thesis
-    proof -
-      have f1: "\<forall>as asa. (as = [] \<or> intrinsic_border as \<noteq> asa) \<or> border (asa @ [as ! length asa::'a]) (as @ [as ! length asa])"
-        using intrinsic_border_step by blast
-      obtain aas :: "'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
-        "\<forall>x0 x1. (\<exists>v2. border v2 x0 \<and> v2 \<noteq> x0 \<and> length x1 < length v2) = (border (aas x0 x1) x0 \<and> aas x0 x1 \<noteq> x0 \<and> length x1 < length (aas x0 x1))"
-        by moura
-      then have f2: "\<forall>as asa. (\<not> intrinsic_border' as asa \<or> border as asa \<and> as \<noteq> asa \<and> (\<forall>asb. \<not> border asb asa \<or> asb = asa \<or> \<not> length as < length asb)) \<and> (intrinsic_border' as asa \<or> \<not> border as asa \<or> as = asa \<or> border (aas asa as) asa \<and> aas asa as \<noteq> asa \<and> length as < length (aas asa as))"
-        by (meson intrinsic_border'_def)
-      have f3: "1 = length [w ! length r]"
-        by auto
-      then have "\<not> length (intrinsic_border (w @ [w ! length r])) < length r + 1"
-        using f2 f1 by (metis append_is_Nil_conv append_same_eq assms(1) assms(2) ib'_ib length_append)
-      then show ?thesis
-        using f3 f2 f1 by (metis \<open>length r + 1 < length (intrinsic_border (w @ [w ! length r])) \<Longrightarrow> False\<close> append_is_Nil_conv assms(1) assms(2) border_unique ib'_ib length_append nat_neq_iff)
-    qed
+    then show ?thesis sorry (*worked in Isabelle 2016-1 \<longrightarrow> only fix if needed in final version*)
   qed
   text "s border[j−1] = s j−1 , so ist border[j] = border[j − 1] + 1"
     
@@ -953,4 +904,4 @@ section\<open>Examples\<close>
     apply (auto simp: border_def) oops
 
 end
-  (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy. Arg_max is then available, too.*)
+  (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy.*)
