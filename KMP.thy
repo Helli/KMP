@@ -607,7 +607,8 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     b!(j-1) = i \<and>
     i < j"(*needed?*)
   definition "I_in_cb s jout \<equiv> \<lambda>i.
-    iblp1 s jout \<le> Suc i"
+    iblp1 s jout \<le> Suc i \<and>
+    (\<exists>i'\<le>jout. i = iblp1 s (i' - 1))"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     ASSERT (s\<noteq>[]);
@@ -739,8 +740,11 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   lemma h: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> take j s ! (iblp1 s (j-1) - 1) = s ! (iblp1 s (j-1) - 1)"
     by (metis (no_types, lifting) One_nat_def Suc_le_eq add_le_imp_le_diff butlast_take diff_is_0_eq' iblp1_le' length_butlast length_take list.size(3) min.absorb2 minus_eq not_one_le_zero nth_butlast nth_take one_add_one)
   
-  lemma weird_bracket_swap'''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s !(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
+  lemma weird_bracket_swap'''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
     by (metis h weird_bracket_swap''''''')
+  
+  corollary generalisation: "1 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
+    by (cases "j = 1") (simp_all add: weird_bracket_swap'''''''' take_Suc0)
   
   lemma rule: "\<lbrakk>A \<Longrightarrow> P; \<not>A \<and> B \<Longrightarrow> P\<rbrakk> \<Longrightarrow> A \<or> B \<Longrightarrow> P" by auto
   
@@ -773,11 +777,32 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       )
     apply (vc_solve solve: asm_rl)
     subgoal by (metis Suc_diff_Suc gr_implies_not_zero iblp1_Suc less_imp_le_nat linorder_neqE_nat minus_nat.diff_0 nz_le_conv_less)
-    subgoal for b j i sorry
-    subgoal for b j i sorry
-    subgoal for b j i sorry
-    subgoal for b j i sorry
-    subgoal for b j i sorry
+    subgoal for b j i
+      by (simp add: intrinsic_border_less'')
+    subgoal for b j i'
+    proof goal_cases
+      case 1
+      then have "iblp1 s' (i' - Suc 0) - Suc 0 < j"
+        by (metis diff_is_0_eq' iblp1_le leI le_less_trans len_greater_imp_nonempty less_imp_diff_less neq0_conv nz_le_conv_less)
+      then have a: "b!(iblp1 s' (i' - Suc 0) - Suc 0) = iblp1 s' (iblp1 s' (i' - Suc 0) - Suc 0)" using "1"(8) by blast
+      with 1 have "iblp1 s' (i'-1) \<le> iblp1 s' (iblp1 s' (i'-1) - 1)"
+      sorry then show ?case unfolding a by (metis (no_types, lifting) "1"(5) One_nat_def leD leI le_less_trans lessI less_trans_Suc)
+    qed
+    subgoal for b j i \<proof>
+    subgoal by (smt One_nat_def Suc_diff_Suc Suc_pred diff_is_0_eq' dual_order.strict_trans2 iblp1_le le_add_diff_inverse2 less_imp_le_nat list.size(3) nat_neq_iff nz_le_conv_less zero_less_one)
+    subgoal for b j i i'
+    proof goal_cases
+      case 1
+      then show ?case apply auto
+         apply (metis gr_implies_not_zero iblp1_j0 le_Suc_eq le_zero_eq less_SucE nth_list_update)
+        apply (cases "j = i")
+         apply auto
+      proof goal_cases
+        case 1 thm generalisation
+        then show ?case apply (cases "i = i'") sorry
+      qed
+    qed
+    subgoal for b j i by (metis diff_le_self gr_implies_not0 iblp1_le le_less_trans len_greater_imp_nonempty neq0_conv nz_le_conv_less)
     done
 
 subsection\<open>Final refinement\<close>
