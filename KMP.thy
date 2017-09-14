@@ -164,9 +164,7 @@ subsection\<open>Basic form\<close>
     \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>is_substring_at s t i')
     \<or> found \<and> is_substring_at s t i"
   definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
-    (*These could probably be subsumed into one case via suffix (take ..) (drop ..)*)
-    \<not>found \<and> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
-    \<or> found \<and> j = length s \<and> is_substring_at s t iout"
+    (\<forall>j'<j. t!(iout+j') = s!(j')) \<and> (if found then j = length s else j < length s)"
   
   definition "na t s \<equiv> do {
     let i=0;
@@ -196,9 +194,10 @@ subsection\<open>Basic form\<close>
           WHILEIT_rule[where R="measure (\<lambda>(j,_::bool). length s - j)"]
           ) 
     apply (vc_solve solve: asm_rl)
-    subgoal by (metis Nat.le_diff_conv2 all_positions_substring less_SucE)
-    subgoal using less_Suc_eq apply blast done
+    subgoal using less_SucE by blast
+    subgoal using less_SucE by blast
     subgoal by (metis less_SucE substring_all_positions)
+    subgoal by (simp add: all_positions_substring)
     subgoal by (meson le_diff_conv2 leI order_trans substring_lengths)
     done
   
@@ -774,6 +773,11 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       )
     apply (vc_solve solve: asm_rl)
     subgoal by (metis Suc_diff_Suc gr_implies_not_zero iblp1_Suc less_imp_le_nat linorder_neqE_nat minus_nat.diff_0 nz_le_conv_less)
+    subgoal for b j i sorry
+    subgoal for b j i sorry
+    subgoal for b j i sorry
+    subgoal for b j i sorry
+    subgoal for b j i sorry
     done
 
 subsection\<open>Final refinement\<close>
