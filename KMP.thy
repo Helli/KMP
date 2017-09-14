@@ -164,6 +164,7 @@ subsection\<open>Basic form\<close>
     \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>is_substring_at s t i')
     \<or> found \<and> is_substring_at s t i"
   definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
+    (*These could probably be subsumed into one case via suffix (take ..) (drop ..)*)
     \<not>found \<and> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
     \<or> found \<and> j = length s \<and> is_substring_at s t iout"
   
@@ -602,12 +603,11 @@ subsection\<open>Algorithm\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
   definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
-    length b = length s \<and>
+    length b = length s \<and>(*Could be removed if the first loop checks length b instead? But then: optimisation against reevaluation difficult \<longrightarrow> add parameter to computeBorders*)
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-    i = b!(j-1) \<and>
+    b!(j-1) = i \<and>
     i < j"(*needed?*)
-  definition "I_in_cb s bout jout \<equiv> \<lambda>i.
-    i < jout \<and> (*needed?*)
+  definition "I_in_cb s jout \<equiv> \<lambda>i.
     iblp1 s jout \<le> Suc i"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
@@ -616,12 +616,12 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     let i=0;
     let j=1;
     (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length s) (\<lambda>(b,i,j). do {
-      i \<leftarrow> WHILEIT (I_in_cb s b j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
       (*Obacht, the \<and> must use short-circuit evaluation
       (otherwise the - actually needs cut-off arithmetic).
       Maybe rewrite beforehand to avoid this?*)
-        ASSERT (i < length b);
-        i \<leftarrow> mop_list_get b i;
+        ASSERT (i-1 < length b);
+        i \<leftarrow> mop_list_get b (i-1);(*difference to let i = b!(i-1); ?*)
         RETURN i
       }) i;
       let i=i+1;
@@ -675,13 +675,22 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       by simp
   qed
   
+  corollary length_ib_take: "2 \<le> j \<Longrightarrow> j \<le> length w \<Longrightarrow> length (intrinsic_border (take j w)) \<le> length (intrinsic_border (take (j-1) w)) + 1"
+    by (metis butlast_take ib_butlast length_take min.absorb2)
+  
   corollary iblp1_Suc: "i < length w \<Longrightarrow> iblp1 w (Suc i) \<le> Suc (iblp1 w i)"
     apply (cases i)
      apply (simp_all add: take_Suc0)
       by (metis Suc_eq_plus1 Suc_leI Suc_le_mono Suc_neq_Zero Suc_to_right ib_butlast le_less_linear length_take less_Suc0 min.absorb2 numerals(2) take_minus_one_conv_butlast)
   
   lemma sus: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border (w@[w!length (intrinsic_border w)])) \<le> length (intrinsic_border w) + 1"
-    oops
+    by (metis Suc_le_mono butlast_snoc ib_butlast length_append_singleton length_ge_1_conv numerals(2))
+  
+  lemma sus':
+    assumes "w \<noteq> []"
+    assumes "j \<le> length w"
+    shows "iblp1 w j \<le> Suc (iblp1 w (j-1))"
+    by (metis (no_types, lifting) One_nat_def Suc_diff_Suc assms(1) assms(2) iblp1_Suc iblp1_le le_less_trans less_imp_le minus_nat.diff_0 not_le nz_le_conv_less zero_less_Suc)
   
   lemma intrinsic_border_step'':
     assumes
@@ -691,20 +700,49 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       "intrinsic_border (w@[w!length r]) = (r@[w!length r])"
   proof-
     {
-      assume "length (intrinsic_border (w @ [w ! length r])) > length r + 1"
-      then have "length (intrinsic_border w) > length r"
-      proof -
-        have "\<not> length (intrinsic_border (w @ [w ! length r])) \<le> length r + 1"
-          by (metis \<open>length r + 1 < length (intrinsic_border (w @ [w ! length r]))\<close> leD)
-        then show ?thesis
-          by (metis (no_types) Suc_leI assms(1) assms(2) butlast_snoc ib_butlast length_Cons length_append length_greater_0_conv less_add_same_cancel2 list.size(3) numeral_2_eq_2)
-      qed
+      assume "length (intrinsic_border (w @ [w ! length r])) > length (r@[w!length r])"
+      then have "\<not> length (intrinsic_border (w @ [w ! length r])) \<le> length r + 1"
+        by auto
+      with assms have "length (intrinsic_border w) > length r"
+        using sus by blast
       with \<open>intrinsic_border w = r\<close> have False by simp
     }
-    then show ?thesis sorry (*worked in Isabelle 2016-1 \<longrightarrow> only fix if needed in final version*)
+    with assms show ?thesis
+    using intrinsic_border_step intrinsic_border_max
+      by (metis append_is_Nil_conv append_one_prefix border_def border_lengths_differ border_order.dual_order.not_eq_order_implies_strict border_order.dual_order.strict_implies_order intrinsic_borderI' intrinsic_border_less le_neq_implies_less not_Cons_self same_prefix_nil)
   qed
-  text "s border[j−1] = s j−1 , so ist border[j] = border[j − 1] + 1"
-    
+  
+  lemma weird_bracket_swap: "w \<noteq> [] \<Longrightarrow>
+    intrinsic_border (w @ [w ! length (intrinsic_border w)]) = (intrinsic_border w) @ [w ! length (intrinsic_border w)]"
+    by (simp add: intrinsic_border_step'')
+  
+  lemma weird_bracket_swap': "butlast w' \<noteq> [] \<Longrightarrow> last w' = butlast w' ! length (intrinsic_border (butlast w')) \<Longrightarrow> intrinsic_border w' = (intrinsic_border (butlast w')) @ [(butlast w') ! length (intrinsic_border (butlast w'))]"
+    by (metis append_butlast_last_id butlast.simps(1) intrinsic_border_step'')
+  
+  lemma weird_bracket_swap'': "butlast w \<noteq> [] \<Longrightarrow> last w = w ! length (intrinsic_border (butlast w)) \<Longrightarrow> intrinsic_border w = (intrinsic_border (butlast w)) @ [w! length (intrinsic_border (butlast w))]"
+    by (metis intrinsic_border_less nth_butlast weird_bracket_swap')
+
+  lemma weird_bracket_swap''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (butlast (take j s))) \<Longrightarrow> intrinsic_border (take j s) = intrinsic_border (butlast (take j s)) @ [take j s ! length (intrinsic_border (butlast (take j s)))]"
+    by (metis (no_types, lifting) One_nat_def add_leD1 last_take_nth_conv length_butlast length_ge_1_conv length_take min.absorb2 not_numeral_le_zero one_add_one ordered_cancel_comm_monoid_diff_class.le_diff_conv2 weird_bracket_swap'')
+  
+  lemma weird_bracket_swap'''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> intrinsic_border (take j s) = intrinsic_border (take (j-1) s) @ [take j s ! length (intrinsic_border (take (j-1) s))]"
+    by (simp add: butlast_take weird_bracket_swap''')
+  
+  lemma weird_bracket_swap''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> length (intrinsic_border (take j s)) = length (intrinsic_border (take (j-1) s)) + 1"
+    by (simp add: butlast_take weird_bracket_swap''')
+  
+  lemma weird_bracket_swap'''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
+    by (metis One_nat_def Suc_le_eq add_le_imp_le_diff iblp1.elims less_imp_le_nat not_one_le_zero numerals(2) one_add_one weird_bracket_swap''''')
+  
+  lemma weird_bracket_swap''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! (iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
+    by (metis add_le_imp_le_diff diff_add_inverse2 iblp1.elims not_one_le_zero one_add_one weird_bracket_swap'''''')
+  
+  lemma h: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> take j s ! (iblp1 s (j-1) - 1) = s ! (iblp1 s (j-1) - 1)"
+    by (metis (no_types, lifting) One_nat_def Suc_le_eq add_le_imp_le_diff butlast_take diff_is_0_eq' iblp1_le' length_butlast length_take list.size(3) min.absorb2 minus_eq not_one_le_zero nth_butlast nth_take one_add_one)
+  
+  lemma weird_bracket_swap'''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s !(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
+    by (metis h weird_bracket_swap''''''')
+  
   lemma rule: "\<lbrakk>A \<Longrightarrow> P; \<not>A \<and> B \<Longrightarrow> P\<rbrakk> \<Longrightarrow> A \<or> B \<Longrightarrow> P" by auto
   
   lemma loop_exit: (*or \<dots>_induct ?*)
@@ -735,30 +773,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
       )
     apply (vc_solve solve: asm_rl)
-    subgoal by (metis diff_less lessE less_Suc_eq_0_disj)
-    subgoal by (metis Suc_diff_Suc gr_implies_not0 iblp1_Suc less_or_eq_imp_le linorder_neqE_nat minus_nat.diff_0 nz_le_conv_less)
-    subgoal by (metis dual_order.strict_trans iblp1_le le_less_trans length_greater_0_conv)
-    subgoal for b j i
-      proof goal_cases
-        case 1
-            {
-        assume y: "iblp1 s' j > Suc (iblp1 s' i)"
-        then obtain jj where yo: "iblp1 s' j = Suc jj" and "jj \<ge> Suc (iblp1 s' i)"
-          using Suc_lessE by auto
-        then obtain ii  where [simp]: "j = Suc ii"
-          by (metis "1"(4) "1"(6) Suc_pred dual_order.strict_trans)
-        note yo[simplified]
-        note intrinsic_border_positions[OF this, simplified]
-        then have yo': "\<forall>j<jj. s'!j = s'!(Suc ii - jj + j)"
-          by (smt "1"(2) "1"(4) "1"(6) One_nat_def Suc_to_right \<open>j = Suc ii\<close> add_diff_cancel_left' iblp1_le' less_diff_conv list.size(3) min_less_iff_conj min_pm1 min_simps(2) nat_neq_iff nth_take yo)
-        with 1 have "s'!(i - 1) = s'!(j - 1)"
-          sorry
-      }
-      then show ?case
-        by (metis "1"(7) One_nat_def le_less_linear)
-    qed
-    subgoal sorry
-    subgoal sorry
+    subgoal by (metis Suc_diff_Suc gr_implies_not_zero iblp1_Suc less_imp_le_nat linorder_neqE_nat minus_nat.diff_0 nz_le_conv_less)
     done
 
 subsection\<open>Final refinement\<close>
