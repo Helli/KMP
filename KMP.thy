@@ -613,7 +613,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     (\<exists>i'\<le>jout. iblp1 s (i'-1) = i \<and> i' \<ge> iblp1 s jout)"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
-    let b=[0 ..< length s + 1];(*op ..< no longer necessary \<longrightarrow> replace with zeroes?*)
+    let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
     let i=0;
     let j=1;
     (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length b) (\<lambda>(b,i,j). do {
@@ -797,8 +797,6 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
     by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
   
-  (*rm*)lemma [simp]: "([0..<b]@[b])!0 = 0" by (cases b) (simp_all add: upt_rec)
-  
   lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
     apply simp
@@ -808,7 +806,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       )
     apply (vc_solve solve: asm_rl, fold One_nat_def) apply-
     apply (metis Suc_eq_plus1 gr_implies_not_zero less_Suc_eq less_Suc_eq_le list.size(3) sus')
-    apply (metis dual_order.order_iff_strict gr_implies_not_zero iblp1_le list.size(3) not_less_less_Suc_eq) 
+    apply (metis dual_order.order_iff_strict gr_implies_not_zero iblp1_le list.size(3) not_less_less_Suc_eq)
     apply (metis gr_implies_not_zero intrinsic_border_less'' less_SucE less_SucI list.size(3))
     subgoal for b j i sorry
     subgoal for b j i sorry
