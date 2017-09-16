@@ -42,78 +42,78 @@ section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<clo
     (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
   thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
 
-section\<open>Subsequence-predicate with a position check\<close>
+section\<open>Sublist-predicate with a position check\<close>
 subsection\<open>Definition\<close>
-  definition "is_substring_at' s t i \<equiv> take (length s) (drop i t) = s"  
+  definition "sublist_at' s t i \<equiv> take (length s) (drop i t) = s"  
   
   text\<open>Problem:\<close>
-  value[nbe] "is_substring_at' [] [a] 5"
-  value[nbe] "is_substring_at' [a] [a] 5"
-  value[nbe] "is_substring_at' [] [] 3"
+  value[nbe] "sublist_at' [] [a] 5"
+  value[nbe] "sublist_at' [a] [a] 5"
+  value[nbe] "sublist_at' [] [] 3"
   text\<open>Not very intuitive...\<close>
   
   text\<open>For the moment, we use this instead:\<close>
-  fun is_substring_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-    t1: "is_substring_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> is_substring_at ss ts 0" |
-    t2: "is_substring_at ss (t#ts) (Suc i) \<longleftrightarrow> is_substring_at ss ts i" |
-    "is_substring_at [] t 0 \<longleftrightarrow> True" |
-    "is_substring_at _ [] _ \<longleftrightarrow> False"
+  fun sublist_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
+    t1: "sublist_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> sublist_at ss ts 0" |
+    t2: "sublist_at ss (t#ts) (Suc i) \<longleftrightarrow> sublist_at ss ts i" |
+    "sublist_at [] t 0 \<longleftrightarrow> True" |
+    "sublist_at _ [] _ \<longleftrightarrow> False"
   
-  export_code is_substring_at(*fails*)
+  export_code sublist_at(*fails*)
   
   lemmas [code del] = t1 t2
   lemma [code]:
-    "is_substring_at ss (t#ts) i \<longleftrightarrow>
-      (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> is_substring_at (tl ss) ts 0 else is_substring_at ss ts (i-1))"  
-    "is_substring_at ss [] i \<longleftrightarrow> ss=[] \<and> i=0"
+    "sublist_at ss (t#ts) i \<longleftrightarrow>
+      (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> sublist_at (tl ss) ts 0 else sublist_at ss ts (i-1))"  
+    "sublist_at ss [] i \<longleftrightarrow> ss=[] \<and> i=0"
     by (cases ss; cases i; auto)+
   
-  export_code is_substring_at(*works*)
+  export_code sublist_at(*works*)
   
   text\<open>For all relevant cases, both definitions agree:\<close>
-  lemma "i \<le> length t \<Longrightarrow> is_substring_at s t i \<longleftrightarrow> is_substring_at' s t i"
-    unfolding is_substring_at'_def
-    by (induction s t i rule: is_substring_at.induct) auto
+  lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> sublist_at' s t i"
+    unfolding sublist_at'_def
+    by (induction s t i rule: sublist_at.induct) auto
   
   text\<open>However, the new definition has some reasonable properties:\<close>
 subsection\<open>Properties\<close>
-  lemma substring_lengths: "is_substring_at s t i \<Longrightarrow> i + length s \<le> length t"
-    apply (induction s t i rule: is_substring_at.induct)
+  lemma sublist_lengths: "sublist_at s t i \<Longrightarrow> i + length s \<le> length t"
+    apply (induction s t i rule: sublist_at.induct)
     apply simp_all
     done
   
-  lemma Nil_is_substring: "i \<le> length t \<longleftrightarrow> is_substring_at ([] :: 'y list) t i"
-    by (induction "[] :: 'y list" t i rule: is_substring_at.induct) auto
+  lemma Nil_is_sublist: "i \<le> length t \<longleftrightarrow> sublist_at ([] :: 'y list) t i"
+    by (induction "[] :: 'y list" t i rule: sublist_at.induct) auto
   
   text\<open>Furthermore, we need:\<close>
-  lemma substring_step:
-    "\<lbrakk>i + length s < length t; is_substring_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> is_substring_at (s@[x]) t i"
-    apply (induction s t i rule: is_substring_at.induct)
+  lemma sublist_step:
+    "\<lbrakk>i + length s < length t; sublist_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> sublist_at (s@[x]) t i"
+    apply (induction s t i rule: sublist_at.induct)
     apply auto
-    using is_substring_at.elims(3) by fastforce
+    using sublist_at.elims(3) by fastforce
   
-  lemma all_positions_substring:
-  "\<lbrakk>i + length s \<le> length t; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> is_substring_at s t i"
+  lemma all_positions_sublist:
+  "\<lbrakk>i + length s \<le> length t; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> sublist_at s t i"
   proof (induction s rule: rev_induct)
     case Nil
-    then show ?case by (simp add: Nil_is_substring)
+    then show ?case by (simp add: Nil_is_sublist)
   next
     case (snoc x xs)
     from \<open>i + length (xs @ [x]) \<le> length t\<close> have "i + length xs \<le> length t" by simp
     moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
       by (simp add: nth_append snoc.prems(2))
-    ultimately have f: "is_substring_at xs t i"
+    ultimately have f: "sublist_at xs t i"
       using snoc.IH by simp
     show ?case
-      apply (rule substring_step)
+      apply (rule sublist_step)
       using snoc.prems(1) snoc.prems(2) apply auto[]
       apply (fact f)
       by (simp add: snoc.prems(2))
   qed
   
-  lemma substring_all_positions:
-    "is_substring_at s t i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
-    by (induction s t i rule: is_substring_at.induct)
+  lemma sublist_all_positions:
+    "sublist_at s t i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
+    by (induction s t i rule: sublist_at.induct)
       (auto simp: nth_Cons')
 
 subsection\<open>Other characterisations:\<close>
@@ -123,47 +123,48 @@ subsection\<open>Other characterisations:\<close>
   | "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
   | "slice _ _ _ = []"  
   
-  lemma slice_char_aux: "is_substring_at s t 0 \<longleftrightarrow> s = slice t 0 (length s)"
+  lemma slice_char_aux: "sublist_at s t 0 \<longleftrightarrow> s = slice t 0 (length s)"
     apply (induction t arbitrary: s)
     subgoal for s by (cases s) auto  
     subgoal for _ _ s by (cases s) auto  
     done    
   
-  lemma slice_char: "i\<le>length t \<Longrightarrow> is_substring_at s t i \<longleftrightarrow> s = slice t i (length s)"
-    apply (induction s t i rule: is_substring_at.induct) 
+  lemma slice_char: "i\<le>length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> s = slice t i (length s)"
+    apply (induction s t i rule: sublist_at.induct) 
     apply (auto simp: slice_char_aux)
     done
   
-  text\<open>In the style of @{theory Sublist} (compare @{const prefix}, @{const suffix} etc.):\<close>
-  lemma substring_altdef: "is_substring_at s t i \<longleftrightarrow> (\<exists>xs ys. xs@s@ys = t \<and> length xs = i)"
-  proof (induction s t i rule: is_substring_at.induct)
+  text\<open>In the style of @{theory Sublist} (compare @{thm[source] sublist_def}):\<close>
+  lemma sublist_at_altdef:
+    "sublist_at xs ys i \<longleftrightarrow> (\<exists>ps ss. ys = ps@xs@ss \<and> i = length ps)"
+  proof (induction xs ys i rule: sublist_at.induct)
     case (2 ss t ts i)
-    show "is_substring_at ss (t#ts) (Suc i) \<longleftrightarrow> (\<exists>xs ys. xs@ss@ys = t#ts \<and> length xs = Suc i)"
+    show "sublist_at ss (t#ts) (Suc i) \<longleftrightarrow> (\<exists>xs ys. t#ts = xs@ss@ys \<and> Suc i = length xs)"
       (is "?lhs \<longleftrightarrow> ?rhs")
     proof
       assume ?lhs
-      then have "is_substring_at ss ts i" by simp
+      then have "sublist_at ss ts i" by simp
       with "2.IH" obtain xs where "\<exists>ys. ts = xs@ss@ys \<and> i = length xs" by auto
-      then have "\<exists>ys. (t#xs)@ss@ys = t#ts \<and> length (t#xs) = Suc i" by auto
+      then have "\<exists>ys. t#ts = (t#xs)@ss@ys \<and> Suc i = length (t#xs)" by simp
       then show ?rhs by blast
     next
       assume ?rhs
-      then obtain xs where "\<exists>ys. xs@ss@ys = t#ts \<and> length xs = Suc i" by blast
-      then have "\<exists>ys. (tl xs)@ss@ys = ts \<and> length (tl xs) = i"
-        by (metis Suc_length_conv len_greater_imp_nonempty list.sel(3) tl_append2 zero_less_Suc)
-      then have "\<exists>xs ys. xs@ss@ys = ts \<and> length xs = i" by blast
+      then obtain xs where "\<exists>ys. t#ts = xs@ss@ys \<and> Suc i = length xs" by blast
+      then have "\<exists>ys. ts = (tl xs)@ss@ys \<and> i = length (tl xs)"
+        by (metis hd_Cons_tl length_0_conv list.sel(3) nat.simps(3) size_Cons_lem_eq tl_append2)
+      then have "\<exists>xs ys. ts = xs@ss@ys \<and> i = length xs" by blast
       with "2.IH" show ?lhs by simp
     qed
   qed auto
-  (*Todo: fifth alternative: inductive is_substring_at*)
+  (*Todo: fifth alternative: inductive sublist_at*)
 
 section\<open>Naive algorithm\<close>
   
   text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
   definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
-    \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>is_substring_at s t i')
-    \<or> found \<and> is_substring_at s t i"
+    \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>sublist_at s t i')
+    \<or> found \<and> sublist_at s t i"
   definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
     (\<forall>j'<j. t!(iout+j') = s!(j')) \<and> (if found then j = length s else j < length s)"
   
@@ -188,7 +189,7 @@ subsection\<open>Basic form\<close>
   }"
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. is_substring_at s t i))"
+    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. sublist_at s t i))"
     unfolding na_def I_out_na_def I_in_na_def
     apply (refine_vcg 
           WHILEIT_rule[where R="measure (\<lambda>(i,_,found). (length t - i) + (if found then 0 else 1))"]
@@ -197,21 +198,21 @@ subsection\<open>Basic form\<close>
     apply (vc_solve solve: asm_rl)
     subgoal using less_SucE by blast
     subgoal using less_SucE by blast
-    subgoal by (metis less_SucE substring_all_positions)
-    subgoal by (simp add: all_positions_substring)
-    subgoal by (meson le_diff_conv2 leI order_trans substring_lengths)
+    subgoal by (metis less_SucE sublist_all_positions)
+    subgoal by (simp add: all_positions_sublist)
+    subgoal by (meson le_diff_conv2 leI order_trans sublist_lengths)
     done
   
   text\<open>The first precondition cannot be removed without an extra branch: If @{term \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{term \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{term \<open>i \<le> length t - length s\<close>} in the first while-condition to @{term \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
   
 subsection\<open>A variant returning the position\<close>
   definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
-    (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
+    (\<forall>i'<i. \<not>sublist_at s t i') \<and>
     (case pos of None \<Rightarrow> j = 0
-      | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
+      | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
   definition "I_in_nap t s iout \<equiv> \<lambda>(j,pos).
     case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
-      | Some p \<Rightarrow> is_substring_at s t iout"
+      | Some p \<Rightarrow> sublist_at s t iout"
 
   definition "nap t s \<equiv> do {
     let i=0;
@@ -233,17 +234,17 @@ subsection\<open>A variant returning the position\<close>
   }"
   
   lemma "s \<noteq> []
-    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
+    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
       )
     apply (vc_solve solve: asm_rl)
-    subgoal by (metis add_Suc_right all_positions_substring less_antisym)
+    subgoal by (metis add_Suc_right all_positions_sublist less_antisym)
     subgoal using less_Suc_eq by blast
-    subgoal by (metis less_SucE substring_all_positions)
-    subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
+    subgoal by (metis less_SucE sublist_all_positions)
+    subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
     done
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
@@ -258,8 +259,8 @@ subsection\<open>Auxiliary definitions\<close>
     by standard (simp add: border_def)
   (*Above interpretations useful? Or provide @{prop "border [] w"} {prop "border w w"} directly?*)
   
-  lemma substring_unique: "\<lbrakk>is_substring_at s t i; is_substring_at s' t i; length s = length s'\<rbrakk> \<Longrightarrow> s = s'"
-    by (metis nth_equalityI substring_all_positions)
+  lemma sublist_unique: "\<lbrakk>sublist_at s t i; sublist_at s' t i; length s = length s'\<rbrakk> \<Longrightarrow> s = s'"
+    by (metis nth_equalityI sublist_all_positions)
   
   lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r w"
     by (auto simp: strict_border_def border_def)
@@ -419,9 +420,9 @@ subsection\<open>@{const arg_min} and @{const arg_max}\<close>
 
 subsection\<open>Invariants\<close>
   definition "I_outer t s \<equiv> \<lambda>(i,j,pos).
-    (\<forall>i'<i. \<not>is_substring_at s t i') \<and>
+    (\<forall>i'<i. \<not>sublist_at s t i') \<and>
     (case pos of None \<Rightarrow> (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
-      | Some p \<Rightarrow> p=i \<and> is_substring_at s t i)"
+      | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
   text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
 
 subsection\<open>Algorithm\<close>
@@ -447,9 +448,9 @@ subsection\<open>Algorithm\<close>
     RETURN pos
   }"
   
-  lemma substring_substring:
-    "\<lbrakk>is_substring_at s1 t i; is_substring_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> is_substring_at (s1@s2) t i"
-    apply (induction s1 t i rule: is_substring_at.induct)
+  lemma sublist_sublist:
+    "\<lbrakk>sublist_at s1 t i; sublist_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> sublist_at (s1@s2) t i"
+    apply (induction s1 t i rule: sublist_at.induct)
     apply auto
     done
   
@@ -477,21 +478,21 @@ subsection\<open>Algorithm\<close>
   
   lemma shift_safe:
     assumes
-      "\<forall>i'<i. \<not>is_substring_at s t i'"
+      "\<forall>i'<i. \<not>sublist_at s t i'"
       "t ! (i + j) \<noteq> s ! j"
       "i' < i + (Suc j - iblp1 s j)" and
       [simp]: "j < length s" and
       old_matches: "\<forall>j'<j. t ! (i + j') = s ! j'"
     shows
-      "\<not>is_substring_at s t i'"
+      "\<not>sublist_at s t i'"
   proof -
     {
       assume "i'<i" --\<open>Old positions, use invariant.\<close>
-      with \<open>\<forall>i'<i. \<not>is_substring_at s t i'\<close> have ?thesis by simp
+      with \<open>\<forall>i'<i. \<not>sublist_at s t i'\<close> have ?thesis by simp
     } moreover {
       assume "i'=i" --\<open>The mismatch occurred while testing this alignment.\<close>
       with \<open>t!(i+j) \<noteq> s!j\<close> \<open>j<length s\<close> have ?thesis
-        using substring_all_positions[of s t i] by auto
+        using sublist_all_positions[of s t i] by auto
     } moreover {
       assume bounds: "i<i'" "i'\<le>i+j-iblp1 s j" --\<open>The skipped positions.\<close>
       from this(1) \<open>i' < i + (Suc j - iblp1 s j)\<close> have "0<j" by linarith
@@ -505,8 +506,8 @@ subsection\<open>Algorithm\<close>
         using \<open>0 < j\<close> bounds(1) by linarith
       have ?thesis
       proof
-        assume "is_substring_at s t i'"
-        note substring_all_positions[OF this]
+        assume "sublist_at s t i'"
+        note sublist_all_positions[OF this]
         with important_and_start_and_end have a: "\<forall>jj < i+j-i'. t!(i'+jj) = s!jj"
           by simp
         from old_matches have "\<forall>jj < i+j-i'. t!(i'+jj) = s!(i'-i+jj)"
@@ -532,23 +533,23 @@ subsection\<open>Algorithm\<close>
       with assms(3) have False by simp
     }
     --\<open>Combine the cases\<close>
-    ultimately show "\<not>is_substring_at s t i'"
+    ultimately show "\<not>sublist_at s t i'"
       by fastforce
   qed
   
   lemma kmp_correct: "s \<noteq> []
     \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
       (*Todo: equivalent to \<not>sublist s t ?*)
-    \<nexists>i. is_substring_at s t i
+    \<nexists>i. sublist_at s t i
     | Some i \<Rightarrow>
-    is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
+    sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
     unfolding kmp_def I_outer_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
       WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
       )
     apply (vc_solve solve: asm_rl)
-    subgoal for i jout j by (metis add_Suc_right all_positions_substring less_antisym)
+    subgoal for i jout j by (metis add_Suc_right all_positions_sublist less_antisym)
     subgoal using less_antisym by blast
     subgoal for i jout j i' using shift_safe[of i s t j i'] by simp
     subgoal for i jout j
@@ -556,7 +557,7 @@ subsection\<open>Algorithm\<close>
       apply (simp_all add: reuse_matches intrinsic_border_less''[unfolded One_nat_def])
       done
     subgoal for i jout j using i_increase[of s _ i j] by fastforce
-    subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
+    subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
     done
   
   text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
@@ -854,15 +855,15 @@ subsection\<open>Final refinement\<close>
     apply vc_solve
     done
   
-  lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
-      | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i) =
-        (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
-      | Some i \<Rightarrow> is_substring_at s t i \<and> (\<forall>i'<i. \<not>is_substring_at s t i'))"
+  lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
+      | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i) =
+        (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
+      | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
     unfolding is_arg_min_def by (auto split: option.split)
   
   lemma "s \<noteq> []
-    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. is_substring_at s t i
-      | Some i \<Rightarrow> is_arg_min id (is_substring_at s t) i)"
+    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
+      | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i)"
     unfolding alternate_form by (fact kmp_correct)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
@@ -964,4 +965,3 @@ section\<open>Examples\<close>
     apply (auto simp: border_def) oops
 
 end
-  (*Todo: rename is_substring_at so that it fits to the new HOL\List.thy.*)
