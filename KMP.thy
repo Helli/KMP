@@ -3,6 +3,7 @@ theory KMP
     "~~/src/HOL/Library/Sublist"
 begin
 
+  declare len_greater_imp_nonempty[simp del]
 section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
   sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
   
@@ -400,7 +401,7 @@ subsection\<open>@{const arg_min} and @{const arg_max}\<close>
       by linarith
   qed
   
-  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> iblp1 s j - Suc 0 < length s"
+  lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> iblp1 s j - 1 < length s"
     by (cases j) (simp_all add: intrinsic_border_less')
   
   lemma "p576 et seq":
@@ -552,7 +553,7 @@ subsection\<open>Algorithm\<close>
     subgoal for i jout j i' using shift_safe[of i s t j i'] by simp
     subgoal for i jout j
       apply (cases "j=0")
-      apply (simp_all add: reuse_matches intrinsic_border_less'')
+      apply (simp_all add: reuse_matches intrinsic_border_less''[unfolded One_nat_def])
       done
     subgoal for i jout j using i_increase[of s _ i j] by fastforce
     subgoal by (auto split: option.splits) (metis substring_lengths add_less_cancel_right leI le_less_trans)
@@ -560,15 +561,14 @@ subsection\<open>Algorithm\<close>
   
   text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
   definition computeBordersSpec :: "'a list \<Rightarrow> nat list nres" where
-    "computeBordersSpec s \<equiv> ASSERT(s\<noteq>[]) \<then> SPEC (\<lambda>l. length l = length s \<and> (\<forall>i<length s. l!i = iblp1 s i))"
-    \<comment>\<open>@{term "i<length s"} is enough, as the @{const ASSERT}-statement right before the @{const iblp1}-usage shows.\<close>
+    "computeBordersSpec s \<equiv> SPEC (\<lambda>l. length l = length s + 1 \<and> (\<forall>j\<le>length s. l!j = iblp1 s j))"
   
   definition "kmp1 t s \<equiv> do {
     ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
     let pos=None;
-    borders \<leftarrow> computeBordersSpec s;
+    borders \<leftarrow> computeBordersSpec (butlast s);(*At the last char, we abort instead.*)
     (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
@@ -585,12 +585,14 @@ subsection\<open>Algorithm\<close>
     RETURN pos
   }"
   
+  lemma iblp1_butlast[simp]: "j < length s \<Longrightarrow> iblp1 (butlast s) j = iblp1 s j"
+    by (cases j) (simp_all add: take_butlast)
+  
   lemma "kmp1 t s \<le> kmp t s"
     apply (rule refine_IdD)
     unfolding kmp1_def kmp_def
     unfolding Let_def computeBordersSpec_def nres_monad_laws
     apply (intro ASSERT_refine_right ASSERT_refine_left)
-    apply simp
     apply simp
     apply (rule Refine_Basic.intro_spec_refine)
     apply refine_rcg
@@ -602,24 +604,20 @@ subsection\<open>Algorithm\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
   definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
-    length b = length s \<and>(*Could be removed if the first loop checks length b instead? But then: optimisation against reevaluation difficult \<longrightarrow> add parameter to computeBorders*)
+    length s + 1 = length b \<and>
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
     b!(j-1) = i \<and>
     i < j"(*needed?*)
   definition "I_in_cb s jout \<equiv> \<lambda>i.
-    iblp1 s jout \<le> Suc i \<and>
-    (\<exists>i'\<le>jout. i = iblp1 s (i' - 1) \<and> i' \<ge> iblp1 s jout)"
+    iblp1 s jout \<le> i+1 \<and>
+    (\<exists>i'\<le>jout. iblp1 s (i'-1) = i \<and> i' \<ge> iblp1 s jout)"
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
-    ASSERT (s\<noteq>[]);
-    let b=[0 ..< length s];(*No longer necessary \<longrightarrow> replace with zeroes?*)
+    let b=[0 ..< length s + 1];(*op ..< no longer necessary \<longrightarrow> replace with zeroes?*)
     let i=0;
     let j=1;
-    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length s) (\<lambda>(b,i,j). do {
+    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length b) (\<lambda>(b,i,j). do {
       i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      (*Obacht, the \<and> must use short-circuit evaluation
-      (otherwise the - actually needs cut-off arithmetic).
-      Maybe rewrite beforehand to avoid this?*)
         ASSERT (i-1 < length b);
         i \<leftarrow> mop_list_get b (i-1);(*difference to let i = b!(i-1); ?*)
         RETURN i
@@ -767,6 +765,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   
   corollary generalisation: "1 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
     by (cases "j = 1") (simp_all add: weird_bracket_swap'''''''' take_Suc0)
+  (*Todo: Needs to be pimped aswell*)
   
   lemma
     assumes "2 \<le> j"
@@ -798,48 +797,31 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
     by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
   
-  lemma computeBorders_refine[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
+  (*rm*)lemma [simp]: "([0..<b]@[b])!0 = 0" by (cases b) (simp_all add: upt_rec)
+  
+  lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
     apply simp
     apply (refine_vcg
-      WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s - j)"]
+      WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
       WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
       )
-    apply (vc_solve solve: asm_rl)
-    subgoal by (metis One_nat_def Suc_eq_plus1 len_greater_imp_nonempty less_or_eq_imp_le pimped)
-    subgoal by (metis gr_implies_not_zero iblp1_le list.size(3) order_le_less)
-    subgoal for b j i
-      by (simp add: intrinsic_border_less'')
-    subgoal for b j i'
-    proof goal_cases
-      case 1
-      then have "iblp1 s' (i' - Suc 0) - Suc 0 < j"
-        by (metis diff_is_0_eq' iblp1_le leI le_less_trans len_greater_imp_nonempty less_imp_diff_less neq0_conv nz_le_conv_less)
-      then have a: "b!(iblp1 s' (i' - Suc 0) - Suc 0) = iblp1 s' (iblp1 s' (i' - Suc 0) - Suc 0)" using "1"(8) by blast
-      with 1 have "iblp1 s' (i'-1) \<le> iblp1 s' (iblp1 s' (i'-1) - 1)"
-      sorry then show ?case unfolding a by (metis (no_types, lifting) "1"(5) One_nat_def leD leI le_less_trans lessI less_trans_Suc)
-    qed
-    subgoal for b j i \<proof>
-    subgoal by (smt One_nat_def diff_le_self iblp1_le iblp1_le' leI le_trans len_greater_imp_nonempty less_imp_Suc_add less_le_trans nat_in_between_eq(1))
-    subgoal for b j i i'
-    proof goal_cases
-      case 1
-      then show ?case
-        apply (cases "i' < j")
-        apply auto
-        subgoal by (metis Suc_leI iblp1_j0 le_Suc_eq le_zero_eq less_SucE not_less_eq_eq nth_list_update_eq nth_list_update_neq)
-        subgoal
-          apply (cases "i = j")
-          apply auto proof goal_cases
-          case 1
-          then show ?case sorry
-        qed
-        subgoal by (metis One_nat_def Suc_pred iblp1_1 iblp1_j0 less_Suc0 less_Suc_eq list.size(3) nat_neq_iff nth_list_update_eq nth_list_update_neq)
-        subgoal by (metis One_nat_def Suc_to_right diff_Suc_less generalisation le_less less_Suc0 less_SucE less_diff_conv less_not_refl3 not_le nth_list_update' nth_list_update_neq zero_less_diff)
-        done
-    qed
-    subgoal for b j i by (metis diff_le_self gr_implies_not0 iblp1_le le_less_trans len_greater_imp_nonempty neq0_conv nz_le_conv_less)
-    done
+    apply (vc_solve solve: asm_rl, fold One_nat_def) apply-
+    apply (metis Suc_eq_plus1 gr_implies_not_zero less_Suc_eq less_Suc_eq_le list.size(3) sus')
+    apply (metis dual_order.order_iff_strict gr_implies_not_zero iblp1_le list.size(3) not_less_less_Suc_eq) 
+    apply (metis gr_implies_not_zero intrinsic_border_less'' less_SucE less_SucI list.size(3))
+    subgoal for b j i sorry
+    subgoal for b j i sorry
+    apply (smt One_nat_def Suc_leI diff_is_0_eq' diff_le_self iblp1_le iblp1_le' less_le_trans list.size(3) nat_neq_iff)
+    subgoal for b j jj i apply auto
+       apply (metis gr_implies_not_zero iblp1_j0 le_Suc_eq le_zero_eq less_Suc_eq nth_list_update)
+      apply (cases "jj = j") apply auto
+      apply (fold One_nat_def)
+      sorry
+    by (metis (mono_tags, lifting) One_nat_def dual_order.strict_trans2 gr_implies_not_zero gr_zeroI iblp1_le less_Suc_eq_le list.size(3) minus_eq nz_le_conv_less)
+  
+  corollary computeBorders_refine'[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
+    by (simp add: computeBorders_refine)
 
 subsection\<open>Final refinement\<close>
   text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
@@ -848,7 +830,7 @@ subsection\<open>Final refinement\<close>
     let i=0;
     let j=0;
     let pos=None;
-    borders \<leftarrow> computeBorders s;
+    borders \<leftarrow> computeBorders (butlast s);
     (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
       (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
@@ -865,7 +847,7 @@ subsection\<open>Final refinement\<close>
     RETURN pos
   }"
   
-  text\<open>Using @{thm [source] computeBorders_refine} (it has @{attribute refine}), the proof is trivial:\<close>
+  text\<open>Using @{thm [source] computeBorders_refine'} (it has @{attribute refine}), the proof is trivial:\<close>
   lemma "kmp2 t s \<le> kmp1 t s"
     apply (rule refine_IdD)
     unfolding kmp2_def kmp1_def
