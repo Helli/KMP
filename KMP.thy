@@ -156,24 +156,28 @@ subsection\<open>Other characterisations:\<close>
       with "2.IH" show ?lhs by simp
     qed
   qed auto
+  
+  corollary sublist_at_iff_sublist: "(\<exists>i. sublist_at s t i) \<longleftrightarrow> Sublist.sublist s t"
+    by (simp add: sublist_at_altdef Sublist.sublist_def)
+  
   (*Todo: fifth alternative: inductive sublist_at*)
 
 section\<open>Naive algorithm\<close>
   
   text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
-  definition "I_out_na t s \<equiv> \<lambda>(i,j,found).
+  definition "I_out_na s t \<equiv> \<lambda>(i,j,found).
     \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>sublist_at s t i')
     \<or> found \<and> sublist_at s t i"
-  definition "I_in_na t s iout \<equiv> \<lambda>(j,found).
+  definition "I_in_na s t iout \<equiv> \<lambda>(j,found).
     (\<forall>j'<j. t!(iout+j') = s!(j')) \<and> (if found then j = length s else j < length s)"
   
-  definition "na t s \<equiv> do {
+  definition "na s t \<equiv> do {
     let i=0;
     let j=0;
     let found=False;
-    (_,_,found) \<leftarrow> WHILEIT (I_out_na t s) (\<lambda>(i,j,found). i \<le> length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
-      (j,found) \<leftarrow> WHILEIT (I_in_na t s i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
+    (_,_,found) \<leftarrow> WHILEIT (I_out_na s t) (\<lambda>(i,j,found). i \<le> length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
+      (j,found) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
         (*ToDo: maybe instead of \<not>found directly query j<length s ?*)
         let j=j+1;
         if j=length s then RETURN (j,True) else RETURN (j,False)
@@ -189,7 +193,7 @@ subsection\<open>Basic form\<close>
   }"
   
   lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-    \<Longrightarrow> na t s \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. sublist_at s t i))"
+    \<Longrightarrow> na s t \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. sublist_at s t i))"
     unfolding na_def I_out_na_def I_in_na_def
     apply (refine_vcg 
           WHILEIT_rule[where R="measure (\<lambda>(i,_,found). (length t - i) + (if found then 0 else 1))"]
@@ -206,20 +210,20 @@ subsection\<open>Basic form\<close>
   text\<open>The first precondition cannot be removed without an extra branch: If @{term \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{term \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{term \<open>i \<le> length t - length s\<close>} in the first while-condition to @{term \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
   
 subsection\<open>A variant returning the position\<close>
-  definition "I_out_nap t s \<equiv> \<lambda>(i,j,pos).
+  definition "I_out_nap s t \<equiv> \<lambda>(i,j,pos).
     (\<forall>i'<i. \<not>sublist_at s t i') \<and>
     (case pos of None \<Rightarrow> j = 0
       | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
-  definition "I_in_nap t s iout \<equiv> \<lambda>(j,pos).
+  definition "I_in_nap s t iout \<equiv> \<lambda>(j,pos).
     case pos of None \<Rightarrow> j < length s \<and> (\<forall>j'<j. t!(iout+j') = s!(j'))
       | Some p \<Rightarrow> sublist_at s t iout"
 
-  definition "nap t s \<equiv> do {
+  definition "nap s t \<equiv> do {
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEIT (I_out_nap t s) (\<lambda>(i,_,pos). i + length s \<le>length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (_,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_out_nap s t) (\<lambda>(i,_,pos). i + length s \<le>length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (_,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
@@ -234,7 +238,7 @@ subsection\<open>A variant returning the position\<close>
   }"
   
   lemma "s \<noteq> []
-    \<Longrightarrow> nap t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+    \<Longrightarrow> nap s t \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
     unfolding nap_def I_out_nap_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
@@ -419,7 +423,7 @@ subsection\<open>@{const arg_min} and @{const arg_max}\<close>
   thm longest_common_prefix
 
 subsection\<open>Invariants\<close>
-  definition "I_outer t s \<equiv> \<lambda>(i,j,pos).
+  definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
     (\<forall>i'<i. \<not>sublist_at s t i') \<and>
     (case pos of None \<Rightarrow> (\<forall>j'<j. t!(i+j') = s!(j')) \<and> j < length s
       | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
@@ -427,13 +431,13 @@ subsection\<open>Invariants\<close>
 
 subsection\<open>Algorithm\<close>
   text\<open>First, we use the non-evaluable function @{const "iblp1"} directly:}\<close>
-  definition "kmp t s \<equiv> do {
+  definition "kmp s t \<equiv> do {
     ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
     let pos=None;
-    (_,_,pos) \<leftarrow> WHILEIT (I_outer t s) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-      (j,pos) \<leftarrow> WHILEIT (I_in_nap t s i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+      (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
         let j=j+1;
         if j=length s then RETURN (j,Some i) else RETURN (j,None)
       }) (j,pos);
@@ -538,11 +542,9 @@ subsection\<open>Algorithm\<close>
   qed
   
   lemma kmp_correct: "s \<noteq> []
-    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow>
-      (*Todo: equivalent to \<not>sublist s t ?*)
-    \<nexists>i. sublist_at s t i
-    | Some i \<Rightarrow>
-    sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+    \<Longrightarrow> kmp s t \<le> SPEC (\<lambda>
+      None \<Rightarrow> \<nexists>i. sublist_at s t i |
+      Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
     unfolding kmp_def I_outer_def I_in_nap_def
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
@@ -564,7 +566,7 @@ subsection\<open>Algorithm\<close>
   definition computeBordersSpec :: "'a list \<Rightarrow> nat list nres" where
     "computeBordersSpec s \<equiv> SPEC (\<lambda>l. length l = length s + 1 \<and> (\<forall>j\<le>length s. l!j = iblp1 s j))"
   
-  definition "kmp1 t s \<equiv> do {
+  definition "kmp1 s t \<equiv> do {
     ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
@@ -589,7 +591,7 @@ subsection\<open>Algorithm\<close>
   lemma iblp1_butlast[simp]: "j < length s \<Longrightarrow> iblp1 (butlast s) j = iblp1 s j"
     by (cases j) (simp_all add: take_butlast)
   
-  lemma "kmp1 t s \<le> kmp t s"
+  lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
     apply (rule refine_IdD)
     unfolding kmp1_def kmp_def
     unfolding Let_def computeBordersSpec_def nres_monad_laws
@@ -824,7 +826,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
 
 subsection\<open>Final refinement\<close>
   text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
-  definition "kmp2 t s \<equiv> do {
+  definition "kmp2 s t \<equiv> do {
     ASSERT (s \<noteq> []);
     let i=0;
     let j=0;
@@ -847,12 +849,31 @@ subsection\<open>Final refinement\<close>
   }"
   
   text\<open>Using @{thm [source] computeBorders_refine'} (it has @{attribute refine}), the proof is trivial:\<close>
-  lemma "kmp2 t s \<le> kmp1 t s"
+  lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
     apply (rule refine_IdD)
     unfolding kmp2_def kmp1_def
     apply refine_rcg
     apply refine_dref_type
     apply vc_solve
+    done
+  
+  lemma kmp2_correct: "s \<noteq> []
+    \<Longrightarrow> kmp2 s t \<le> SPEC (\<lambda>
+      None \<Rightarrow> \<nexists>i. sublist_at s t i |
+      Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+    (is "?s_ok \<Longrightarrow> _ \<le> ?SPEC")
+  proof -
+    assume ?s_ok
+    have "kmp2 s t \<le> kmp1 s t" by (fact kmp2_refine)
+    also have "... \<le> kmp s t" by (fact kmp1_refine)
+    also have "... \<le> ?SPEC" by (fact kmp_correct[OF \<open>?s_ok\<close>])
+    finally show ?thesis.
+  qed
+  
+  corollary kmp2_sublist: "s \<noteq> [] \<Longrightarrow> kmp2 s t \<le> SPEC (\<lambda>p. p\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
+    apply (intro SPEC_cons_rule[OF kmp2_correct])
+    apply assumption
+    apply (metis (mono_tags, lifting) case_optionE option.simps(3) sublist_at_iff_sublist)
     done
   
   lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
@@ -862,7 +883,7 @@ subsection\<open>Final refinement\<close>
     unfolding is_arg_min_def by (auto split: option.split)
   
   lemma "s \<noteq> []
-    \<Longrightarrow> kmp t s \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
+    \<Longrightarrow> kmp s t \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
       | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i)"
     unfolding alternate_form by (fact kmp_correct)
 
