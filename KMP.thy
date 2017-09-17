@@ -3,7 +3,7 @@ theory KMP
     "~~/src/HOL/Library/Sublist"
 begin
 
-  declare len_greater_imp_nonempty[simp del]
+  declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
 section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
   sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
   
@@ -603,6 +603,26 @@ subsection\<open>Algorithm\<close>
     apply vc_solve
     done
   
+  lemma todoname[simp]: "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow> take (length (intrinsic_border (take j s))) s = intrinsic_border (take j s)"
+  proof - assume "0 < j" "j \<le> length s"
+    have "length (intrinsic_border (take j s)) < j"
+      by (metis \<open>0 < j\<close> \<open>j \<le> length s\<close> intrinsic_border_less length_greater_0_conv length_take min_absorb2)
+    also note \<open>j \<le> length s\<close>
+    finally have "length (intrinsic_border (take j s)) < length s".
+    moreover {have "prefix (intrinsic_border (take j s)) (take j s)"
+      by (metis \<open>0 < j\<close> \<open>j \<le> length s\<close> border_def intrinsic_borderI' length_greater_0_conv less_le_trans nat_neq_iff strict_border_def take_eq_Nil)
+    also have "prefix (take j s) s" by (simp add: \<open>j \<le> length s\<close> take_is_prefix)
+    finally have "prefix (intrinsic_border (take j s)) s".}
+    ultimately show ?thesis
+      by (metis append_eq_append_conv append_take_drop_id length_take min_simps(2) prefix_def)
+  qed
+  
+  lemma I_out_2_I_in: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s (j-1) = i \<Longrightarrow> strict_border (take (i-1) s) (take (j-1) s)" (*inline i?*)
+    apply (cases "j-1")
+    apply auto
+    by (metis intrinsic_borderI' le_0_eq list.size(3) nat.simps(3) take_eq_Nil zero_not_eq_two)
+  
+  (*Was wäre die Folge von so einer bedingten Invariante? (if j > 1 then Inv' else i = 1)*)
   text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   term I_out_na
@@ -769,16 +789,6 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   corollary generalisation: "1 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
     by (cases "j = 1") (simp_all add: weird_bracket_swap'''''''' take_Suc0)
   (*Todo: Needs to be pimped aswell*)
-  
-  lemma
-    assumes "2 \<le> j"
-    assumes "j \<le> length s"
-    assumes "iblp1 s j \<le> iblp1 s (i-1) + 1"
-    assumes "iblp1 s j \<le> i"
-    assumes "i < j"
-    assumes "s ! (iblp1 s (i-1) - 1) = s!(j-1)"
-    shows "iblp1 s (i-1) + 1 = iblp1 s j"
-    oops
   
   lemma loop_exit: (*or \<dots>_induct ?*)
     assumes
