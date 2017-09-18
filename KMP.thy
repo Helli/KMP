@@ -372,7 +372,7 @@ subsection\<open>@{const arg_min} and @{const arg_max}\<close>
   fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
     "iblp1 s 0 = 0"\<comment>\<open>This increments the compare position while \<^term>\<open>j=0\<close>\<close> |
     "iblp1 s j = length (intrinsic_border (take j s)) + 1"
-    --\<open>Todo: Better name, replace +1 with Suc\<close>
+    --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
   
   lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
     by (cases j) simp_all
@@ -465,14 +465,14 @@ subsection\<open>Algorithm\<close>
     from iblp1_le'[of j s] thi(1,4) have "\<forall>j'<j. t ! (i + j') = s ! j'" by blast
     with thi have 1: "\<forall>j'<iblp1 s j - 1. t ! (i + j + 1 - iblp1 s j + j') = s ! (j - iblp1 s j + 1 + j')"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc add_diff_cancel_left' iblp1_le le_add_diff_inverse2 len_greater_imp_nonempty less_diff_conv less_or_eq_imp_le)
-    have meh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
+    have duh: "length (intrinsic_border (take j s)) = iblp1 s j - 1"
       by (metis iblp1.elims diff_add_inverse2 nat_neq_iff thi(1))
     have "\<forall>ja<length (intrinsic_border (take j s)). take j s ! ja = take j s ! (min (length s) j - length (intrinsic_border (take j s)) + ja)"
       by (metis border_positions intrinsic_borderI' length_greater_0_conv length_take min.absorb2 strict_border_def thi(1) thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - (iblp1 s j - 1) + ja)"
-      by (simp add: meh min.absorb2 thi(3))
+      by (simp add: duh min.absorb2 thi(3))
     then have "\<forall>ja<iblp1 s j - 1. take j s ! ja = take j s ! (j - iblp1 s j + 1 + ja)"
-      by (metis One_nat_def Suc_n_minus_m_eq add.right_neutral add_Suc_right iblp1_le le_zero_eq len_greater_imp_nonempty length_greater_0_conv list.size(3) meh thi(1) thi(3) zero_less_diff)
+      by (metis One_nat_def Suc_n_minus_m_eq add.right_neutral add_Suc_right iblp1_le le_zero_eq len_greater_imp_nonempty length_greater_0_conv list.size(3) duh thi(1) thi(3) zero_less_diff)
     with thi have 2: "\<forall>j'<iblp1 s j - 1. s ! (j - iblp1 s j + 1 + j') = s ! j'"
       by (smt Groups.ab_semigroup_add_class.add.commute Groups.semigroup_add_class.add.assoc iblp1_le iblp1_le' le_add_diff_inverse2 le_less_trans less_diff_conv less_imp_le_nat nat_add_left_cancel_less nth_take take_eq_Nil)
     from 1 2 have "\<forall>j'<iblp1 s j - 1. t ! (Suc (i+j) - iblp1 s j + j') = s ! j'"
@@ -968,9 +968,8 @@ section\<open>Examples\<close>
   lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
     ''''
     }"
-    apply (auto simp: border_def slice_char_aux)
-    done
-    
+    by (simp add: border_bot.bot.extremum_unique)
+  
   lemma ex1: "border a ''a'' \<longleftrightarrow> a\<in>{
     '''',
     ''a''
