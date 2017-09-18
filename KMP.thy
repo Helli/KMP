@@ -485,15 +485,15 @@ subsection\<open>Algorithm\<close>
       "\<forall>ii<i. \<not>sublist_at s t ii"
       "t!(i+j) \<noteq> s!j" and
       [simp]: "j < length s" and
-      old_matches: "\<forall>jj<j. t ! (i + jj) = s ! jj"
+      matches: "\<forall>jj<j. t!(i+jj) = s!jj"
     defines
-      assignment: "i' \<equiv> i + j + 1 - iblp1 s j"
+      assignment: "i' \<equiv> j + i + 1 - iblp1 s j"
     shows
       "\<forall>ii<i'. \<not>sublist_at s t ii"
   proof (standard, standard)
     fix ii
     assume "ii < i'"
-    then consider
+    then consider \<comment>\<open>The position falls into one of three categories:\<close>
       (old) "ii < i" |
       (current) "ii = i" |
       (skipped) "ii > i"
@@ -510,31 +510,42 @@ subsection\<open>Algorithm\<close>
       case skipped --\<open>The skipped positions.\<close>
       then have "0<j"
         using \<open>ii < i'\<close> assignment by linarith
-      have important_and_start_and_end: "i + j - ii \<le> length s"
+      have important_at_start_and_end: "j + i - ii \<le> length s"
         using \<open>ii < i'\<close> assms(3) skipped by linarith
-      have "i + j - ii > iblp1 s j - 1"
-        by (smt One_nat_def Suc_diff_Suc Suc_eq_plus1 \<open>0 < j\<close> \<open>ii < i'\<close> ab_semigroup_add_class.add.commute add.assoc add_diff_cancel_right' assignment gr_implies_not0 gr_implies_not_zero iblp1_j0 less_diff_conv linorder_neqE_nat not_less0 not_less_zero)
-      then have contradiction: "i + j - ii > length (intrinsic_border (take j s))"
+      have f1: "ii + iblp1 s j < j + i + 1"
+        by (metis \<open>ii < i'\<close> assignment less_diff_conv)
+      have "0 < iblp1 s j"
+        by (metis \<open>0 < j\<close> iblp1_j0 linorder_neqE_nat not_less_zero)
+      then have "j + i - ii > iblp1 s j - 1"
+        using f1 by linarith
+      then have contradiction_goal: "j + i - ii > length (intrinsic_border (take j s))"
         by (metis (no_types, lifting) One_nat_def Suc_eq_plus1 \<open>0 < j\<close> add_less_cancel_right cancel_comm_monoid_add_class.diff_cancel iblp1.elims length_greater_0_conv less_diff_conv2 less_imp_le_nat list.size(3) nat_neq_iff)
-      have [simp]: "i + j - ii < j"
+      have [simp]: "j + i - ii < j"
         using \<open>0 < j\<close> skipped by linarith
       show ?thesis
       proof
         assume "sublist_at s t ii"
         note sublist_all_positions[OF this]
-        with important_and_start_and_end have a: "\<forall>jj < i+j-ii. t!(ii+jj) = s!jj"
+        with important_at_start_and_end have a: "\<forall>jj < j+i-ii. t!(ii+jj) = s!jj"
           by simp
-        from old_matches have "\<forall>jj < i+j-ii. t!(ii+jj) = s!(ii-i+jj)"
-          by (smt Nat.add_diff_assoc2 ab_semigroup_add_class.add.commute add.assoc skipped le_add2 less_diff_conv less_diff_conv2 less_or_eq_imp_le ordered_cancel_comm_monoid_diff_class.add_diff_inverse)
-        then have "\<forall>jj < i+j-ii. s!jj = s!(ii-i+jj)"
+        have ff1: "\<not> ii < i"
+          by (metis not_less_iff_gr_or_eq skipped)
+        then have "i + (ii - i + jj) = ii + jj" for jj
+          by (metis add.assoc add_diff_inverse_nat)
+        then have "\<not> jj < j + i - ii \<or> t ! (ii + jj) = s ! (ii - i + jj)" if "ii - i + jj < j" for jj
+          using that ff1 by (metis matches)
+        then have "\<not> jj < j + i - ii \<or> t ! (ii + jj) = s ! (ii - i + jj)" for jj
+          using ff1 by auto
+        with matches have "\<forall>jj < j+i-ii. t!(ii+jj) = s!(ii-i+jj)" by metis
+        then have "\<forall>jj < j+i-ii. s!jj = s!(ii-i+jj)"
           using a by auto
-        then have "\<forall>jj < i+j-ii. (take j s)!jj = (take j s)!(ii-i+jj)"
+        then have "\<forall>jj < j+i-ii. (take j s)!jj = (take j s)!(ii-i+jj)"
           using \<open>i<ii\<close> by auto
-        with positions_strict_border[of "i+j-ii" "take j s", simplified] have "strict_border (take (i+j-ii) s) (take j s)"
+        with positions_strict_border[of "j+i-ii" "take j s", simplified] have "strict_border (take (j+i-ii) s) (take j s)"
           by blast
         note intrinsic_border_max[OF this]
-        moreover note contradiction
-        also have "i+j-ii \<le> length s" by fact
+        moreover note contradiction_goal
+        also have "j+i-ii \<le> length s" by (fact important_at_start_and_end)
         ultimately
         show False by simp
       qed
@@ -680,6 +691,9 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     using append_one_prefix prefixE apply fastforce
     using append_prefixD apply blast
     done
+  
+  corollary strict_border_step: "strict_border r w \<longleftrightarrow> strict_border (r@[w!length r]) (w@[w!length r])"
+    unfolding strict_border_def using border_step by blast(*or use proof above*)
   
   lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
     using border_step intrinsic_borderI' strict_border_def by blast
