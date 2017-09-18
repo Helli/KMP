@@ -306,11 +306,11 @@ subsection\<open>Auxiliary definitions\<close>
   
   thm suffix_drop take_is_prefix (* That naming -.- *)
   
-  lemma positions_border: "\<forall>j<i. w!j = w!(length w - i + j) \<Longrightarrow> border (take i w) w"
-    by (cases "i < length w") (simp_all add: border_def all_positions_suffix_take take_is_prefix)
+  lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> border (take l w) w"
+    by (cases "l < length w") (simp_all add: border_def all_positions_suffix_take take_is_prefix)
   
-  corollary positions_strict_border: "i < length w \<Longrightarrow> \<forall>j<i. w!j = w!(length w - i + j) \<Longrightarrow> strict_border (take i w) w"
-    by (metis length_take min_simps(2) nat_neq_iff positions_border strict_border_def)
+  lemma positions_strict_border: "l < length w \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> strict_border (take l w) w"
+    by (simp add: strict_border_altdef border_def all_positions_suffix_take take_is_prefix)
 
 subsection\<open>@{const arg_min} and @{const arg_max}\<close>
   lemma arg_max_natI2:
@@ -482,63 +482,63 @@ subsection\<open>Algorithm\<close>
   
   lemma shift_safe:
     assumes
-      "\<forall>i'<i. \<not>sublist_at s t i'"
-      "t ! (i + j) \<noteq> s ! j"
-      "i' < i + (Suc j - iblp1 s j)" and
+      "\<forall>ii<i. \<not>sublist_at s t ii"
+      "t!(i+j) \<noteq> s!j" and
       [simp]: "j < length s" and
-      old_matches: "\<forall>j'<j. t ! (i + j') = s ! j'"
+      old_matches: "\<forall>jj<j. t ! (i + jj) = s ! jj"
+    defines
+      assignment: "i' \<equiv> i + j + 1 - iblp1 s j"
     shows
-      "\<not>sublist_at s t i'"
-  proof -
-    {
-      assume "i'<i" --\<open>Old positions, use invariant.\<close>
-      with \<open>\<forall>i'<i. \<not>sublist_at s t i'\<close> have ?thesis by simp
-    } moreover {
-      assume "i'=i" --\<open>The mismatch occurred while testing this alignment.\<close>
-      with \<open>t!(i+j) \<noteq> s!j\<close> \<open>j<length s\<close> have ?thesis
+      "\<forall>ii<i'. \<not>sublist_at s t ii"
+  proof (standard, standard)
+    fix ii
+    assume "ii < i'"
+    then consider
+      (old) "ii < i" |
+      (current) "ii = i" |
+      (skipped) "ii > i"
+      by linarith
+    then show "\<not>sublist_at s t ii"
+    proof cases
+      case old --\<open>Old position, use invariant.\<close>
+      with \<open>\<forall>ii<i. \<not>sublist_at s t ii\<close> show ?thesis by simp
+    next
+      case current --\<open>The mismatch occurred while testing this alignment.\<close>
+      with \<open>t!(i+j) \<noteq> s!j\<close> show ?thesis
         using sublist_all_positions[of s t i] by auto
-    } moreover {
-      assume bounds: "i<i'" "i'\<le>i+j-iblp1 s j" --\<open>The skipped positions.\<close>
-      from this(1) \<open>i' < i + (Suc j - iblp1 s j)\<close> have "0<j" by linarith
-      have important_and_start_and_end: "i + j - i' < length s"
-        using assms(4) bounds(1) by linarith
-      have "i + j - i' > iblp1 s j - 1"
-        by (smt Suc_diff Suc_leI Suc_lessI add_Suc_right add_diff_cancel_left' bounds(1) bounds(2) diff_Suc_Suc diff_diff_cancel diff_le_self diff_less diff_less_mono2 diff_zero dual_order.strict_trans iblp1_j0 le_add2 le_less_trans le_neq_implies_less le_numeral_extra(1) less_imp_diff_less less_imp_le_nat zero_less_diff zero_neq_one)
-      then have contradiction: "i + j - i' > length (intrinsic_border (take j s))"
+    next
+      case skipped --\<open>The skipped positions.\<close>
+      then have "0<j"
+        using \<open>ii < i'\<close> assignment by linarith
+      have important_and_start_and_end: "i + j - ii \<le> length s"
+        using \<open>ii < i'\<close> assms(3) skipped by linarith
+      have "i + j - ii > iblp1 s j - 1"
+        by (smt One_nat_def Suc_diff_Suc Suc_eq_plus1 \<open>0 < j\<close> \<open>ii < i'\<close> ab_semigroup_add_class.add.commute add.assoc add_diff_cancel_right' assignment gr_implies_not0 gr_implies_not_zero iblp1_j0 less_diff_conv linorder_neqE_nat not_less0 not_less_zero)
+      then have contradiction: "i + j - ii > length (intrinsic_border (take j s))"
         by (metis (no_types, lifting) One_nat_def Suc_eq_plus1 \<open>0 < j\<close> add_less_cancel_right cancel_comm_monoid_add_class.diff_cancel iblp1.elims length_greater_0_conv less_diff_conv2 less_imp_le_nat list.size(3) nat_neq_iff)
-      have [simp]: "i + j - i' < j"
-        using \<open>0 < j\<close> bounds(1) by linarith
-      have ?thesis
+      have [simp]: "i + j - ii < j"
+        using \<open>0 < j\<close> skipped by linarith
+      show ?thesis
       proof
-        assume "sublist_at s t i'"
+        assume "sublist_at s t ii"
         note sublist_all_positions[OF this]
-        with important_and_start_and_end have a: "\<forall>jj < i+j-i'. t!(i'+jj) = s!jj"
+        with important_and_start_and_end have a: "\<forall>jj < i+j-ii. t!(ii+jj) = s!jj"
           by simp
-        from old_matches have "\<forall>jj < i+j-i'. t!(i'+jj) = s!(i'-i+jj)"
-          by (smt Nat.add_diff_assoc2 ab_semigroup_add_class.add.commute add.assoc bounds(1) le_add2 less_diff_conv less_diff_conv2 less_or_eq_imp_le ordered_cancel_comm_monoid_diff_class.add_diff_inverse)
-        then have "\<forall>jj < i+j-i'. s!jj = s!(i'-i+jj)"
+        from old_matches have "\<forall>jj < i+j-ii. t!(ii+jj) = s!(ii-i+jj)"
+          by (smt Nat.add_diff_assoc2 ab_semigroup_add_class.add.commute add.assoc skipped le_add2 less_diff_conv less_diff_conv2 less_or_eq_imp_le ordered_cancel_comm_monoid_diff_class.add_diff_inverse)
+        then have "\<forall>jj < i+j-ii. s!jj = s!(ii-i+jj)"
           using a by auto
-        then have "\<forall>jj < i+j-i'. (take j s)!jj = (take j s)!(i'-i+jj)"
-          using \<open>i<i'\<close> by auto
-        with positions_border[of "i+j-i'" "take j s", simplified]
-        have "border (take (i+j-i') s) (take j s)".
-        moreover have "take (i+j-i') s \<noteq> take j s"
-          by (metis \<open>i + j - i' < j\<close> assms(4) important_and_start_and_end length_take min_simps(2) nat_neq_iff)
-        ultimately have "strict_border (take (i+j-i') s) (take j s)" by simp
-          note intrinsic_border_max[OF this]
+        then have "\<forall>jj < i+j-ii. (take j s)!jj = (take j s)!(ii-i+jj)"
+          using \<open>i<ii\<close> by auto
+        with positions_strict_border[of "i+j-ii" "take j s", simplified] have "strict_border (take (i+j-ii) s) (take j s)"
+          by blast
+        note intrinsic_border_max[OF this]
         moreover note contradiction
-        moreover have "i+j-i' \<le> length s"
-          using \<open>i + j - i' < j\<close> \<open>j < length s\<close> by linarith
+        also have "i+j-ii \<le> length s" by fact
         ultimately
         show False by simp
       qed
-    } moreover {
-      assume "i'\<ge>i+(j+1 - iblp1 s j)" --\<open>Future positions, not part of the lemma.\<close>
-      with assms(3) have False by simp
-    }
-    --\<open>Combine the cases\<close>
-    ultimately show "\<not>sublist_at s t i'"
-      by fastforce
+    qed
   qed
   
   lemma kmp_correct: "s \<noteq> []
@@ -553,7 +553,7 @@ subsection\<open>Algorithm\<close>
     apply (vc_solve solve: asm_rl)
     subgoal for i jout j by (metis add_Suc_right all_positions_sublist less_antisym)
     subgoal using less_antisym by blast
-    subgoal for i jout j i' using shift_safe[of i s t j i'] by simp
+    subgoal for i jout j ii using shift_safe[of i s t j] by fastforce
     subgoal for i jout j
       apply (cases "j=0")
       apply (simp_all add: reuse_matches intrinsic_border_less''[unfolded One_nat_def])
