@@ -258,7 +258,7 @@ subsection\<open>Auxiliary definitions\<close>
   definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> xs \<noteq> ys"(*Try altdef here?*)
   
   interpretation border_order: order border strict_border
-    by (standard, auto simp: border_def suffix_def strict_border_def)
+    by standard (auto simp: border_def suffix_def strict_border_def)
   interpretation border_bot: order_bot Nil border strict_border
     by standard (simp add: border_def)
   (*Above interpretations useful? Or provide @{prop "border [] w"} {prop "border w w"} directly?*)
@@ -633,18 +633,16 @@ subsection\<open>Algorithm\<close>
     apply auto
     by (metis intrinsic_borderI' le_0_eq list.size(3) nat.simps(3) take_eq_Nil zero_not_eq_two)
   
-  (*Was wäre die Folge von so einer bedingten Invariante? (if j > 1 then Inv' else i = 1)*)
   text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
-  term I_out_na
   definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
     length s + 1 = length b \<and>
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-    b!(j-1) = i \<and>
-    i < j"(*needed?*)
-  definition "I_in_cb s jout \<equiv> \<lambda>i.
-    iblp1 s jout \<le> i+1 \<and>
-    (\<exists>i'\<le>jout. iblp1 s (i'-1) = i \<and> i' \<ge> iblp1 s jout)"
+    b!(j-1) = i"
+  definition "I_in_cb' s j i \<equiv> (if s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else \<exists>ii\<le> iblp1 s (i-1). iblp1 s j = ii)"
+  definition "I_in_cb s j \<equiv> \<lambda>i.
+    (if j=1 then i=0 else (strict_border (take i s) (take (j-1) s) \<and> I_in_cb' s j i))"
+    print_theorems
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
