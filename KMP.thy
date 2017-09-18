@@ -1,6 +1,6 @@
 theory KMP
   imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
-    "~~/src/HOL/Library/Sublist"
+    "HOL-Library.Sublist"
 begin
 
   declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
@@ -633,38 +633,6 @@ subsection\<open>Algorithm\<close>
     apply auto
     by (metis intrinsic_borderI' le_0_eq list.size(3) nat.simps(3) take_eq_Nil zero_not_eq_two)
   
-  text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
-subsubsection\<open>Computing @{const iblp1}\<close>
-  definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
-    length s + 1 = length b \<and>
-    (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-    b!(j-1) = i \<and> (*needed?*)
-    0 < j"
-  definition "I_in_cb' s j i \<equiv> (if s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else \<exists>ii\<le> iblp1 s (i-1). iblp1 s j = ii + 1)"
-  definition "I_in_cb s j \<equiv> \<lambda>i.
-    (if j>1 then (strict_border (take (i-1) s) (take (j-1) s) \<and> I_in_cb' s j i) else i=0)"
-    print_theorems
-  definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
-    "computeBorders s = do {
-    let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
-    let i=0;
-    let j=1;
-    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length b) (\<lambda>(b,i,j). do {
-      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-        ASSERT (i-1 < length b);
-        i \<leftarrow> mop_list_get b (i-1);(*difference to let i = b!(i-1); ?*)
-        RETURN i
-      }) i;
-      let i=i+1;
-      ASSERT (j < length b);
-      b \<leftarrow> mop_list_set b j i;
-      let j=j+1;
-      RETURN (b,i,j)
-    }) (b,i,j);
-    
-    RETURN b
-  }"
-  
   lemma iblp1_1: "s\<noteq>[] \<Longrightarrow> iblp1 s 1 = 1"
     by (metis One_nat_def Suc_lessI add_gr_0 iblp1.simps(2) iblp1_le leD zero_less_one)
   
@@ -822,6 +790,38 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   corollary intrinsic_border_positions: "length (intrinsic_border w) = l
     \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
     by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
+  
+  text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
+subsubsection\<open>Computing @{const iblp1}\<close>
+  definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
+    length s + 1 = length b \<and>
+    (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
+    b!(j-1) = i \<and> (*needed?*)
+    0 < j"
+  definition "I_in_cb' s j i \<equiv> (if s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else \<exists>ii\<le> iblp1 s (i-1). iblp1 s j = ii + 1)"
+  definition "I_in_cb s j \<equiv> \<lambda>i.
+    (if j>1 then (strict_border (take (i-1) s) (take (j-1) s) \<and> I_in_cb' s j i) else i=0)"
+    print_theorems
+  definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
+    "computeBorders s = do {
+    let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
+    let i=0;
+    let j=1;
+    (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length b) (\<lambda>(b,i,j). do {
+      i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+        ASSERT (i-1 < length b);
+        i \<leftarrow> mop_list_get b (i-1);(*difference to let i = b!(i-1); ?*)
+        RETURN i
+      }) i;
+      let i=i+1;
+      ASSERT (j < length b);
+      b \<leftarrow> mop_list_set b j i;
+      let j=j+1;
+      RETURN (b,i,j)
+    }) (b,i,j);
+    
+    RETURN b
+  }"
   
   lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def I_in_cb'_def
