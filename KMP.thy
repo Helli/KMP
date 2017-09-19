@@ -1,5 +1,5 @@
 theory KMP
-  imports "$AFP/Refine_Imperative_HOL/IICF/IICF"
+  imports Refine_Imperative_HOL.IICF
     "HOL-Library.Sublist"
 begin
 
