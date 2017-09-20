@@ -662,6 +662,10 @@ subsection\<open>Algorithm\<close>
   corollary strict_border_step: "strict_border r w \<longleftrightarrow> strict_border (r@[w!length r]) (w@[w!length r])"
     unfolding strict_border_def using border_step by blast(*or use proof above*)
   
+  corollary strict_border_step': "i-1 < j-1 \<Longrightarrow> i-1 < length s \<Longrightarrow> strict_border (take (i - 1) s) (take (j-1) s) \<longleftrightarrow> strict_border (take (i-1) s @ [s!(i-1)]) (take (j-1) s @ [s!(i-1)])"
+    using strict_border_step[of "take (i-1) s" "take (j-1) s", simplified, folded One_nat_def]
+      by (metis (no_types) min_simps(2) nth_take)
+  
   lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
     using border_step intrinsic_borderI' strict_border_def by blast
   
@@ -785,6 +789,13 @@ subsection\<open>Algorithm\<close>
   lemma yo: "\<forall>jj<iblp1 s (Suc j) - 1. take (Suc j) s ! jj = take (Suc j) s ! (length (take (Suc j) s) + 1 - iblp1 s (Suc j) + jj)"
     by (simp add: intrinsic_border_positions')
   
+  lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
+    apply (cases i, simp_all)
+    by (metis border_order.order.strict_implies_order intrinsic_borderI' intrinsic_border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil todoname zero_less_Suc)
+  
+  lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
+    by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right border_length_less iblp1.elims intrinsic_border_max length_take min.absorb2)
+  
   text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
   definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
@@ -853,9 +864,29 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     subgoal for b j i
     proof goal_cases
       case 1
-      then have "i - 1 < j"
-        by (smt One_nat_def border_length_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
-      with 1 show ?case thm strict_border_step sorry
+      then have "i - 1 < j - 1"
+        by (metis (mono_tags, lifting) border_length_r_less length_take less_Suc_eq_le min.absorb2 min_less_iff_conj)
+      then have "iblp1 s (i-1) already computed": "i - 1 < j" by simp
+      then have duh: "i - 1 < length s"
+        using "1"(1) "1"(5) by linarith
+      then have i'_lower: "iblp1 s (i-1) - 1 < j - 1" "iblp1 s (i-1) - 1 < length s "
+        by (metis \<open>i - 1 < j - 1\<close> iblp1_le le_less_trans len_greater_imp_nonempty less_imp_diff_less)+
+      have "border (take (iblp1 s (i-1) - 1) s) (take (i-1) s)"
+        by (fact border_take_iblp1)
+      also note \<open>strict_border (take (i-1) s) (take (j-1) s)\<close>
+      finally have "strict_border (take (iblp1 s (i-1)-1) s @ [s!(iblp1 s (i-1)-1)]) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])"
+        using strict_border_step'[OF i'_lower]
+        by simp
+      then have "strict_border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])"
+        by (metis "1"(10) "1"(3) "1"(9) Suc_diff_1 i'_lower(2) iblp1_j0 less_SucE minus_eq take_Suc_conv_app_nth zero_less_Suc)
+      with \<open>s!(b!(i-1) - 1) = s!(j-1)\<close> have "strict_border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(j-1)])"
+        using "1"(10) "iblp1 s (i-1) already computed" by auto
+      then have ib_candidate: "strict_border (take (iblp1 s (i-1)) s) (take j s)"
+        by (metis "1"(1) "1"(5) "iblp1 s (i-1) already computed" One_nat_def Suc_to_right less_imp_Suc_add not_less_eq take_Suc_conv_app_nth)
+      then have "iblp1 s j \<ge> iblp1 s (i-1) + 1" using iblp1_max[OF _ ib_candidate]
+        by (smt "1"(1) "1"(5) Suc_leI duh iblp1_le len_greater_imp_nonempty length_take less_Suc_eq_le less_le_trans min_simps(2))
+      with \<open>iblp1 s j \<le> Suc (iblp1 s (i-1))\<close> show ?case
+        using "1"(10) "iblp1 s (i-1) already computed" le_antisym by presburger
     qed
     subgoal for b j i
     proof goal_cases
