@@ -4,6 +4,7 @@ theory KMP
 begin
 
   declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
+  no_notation Ref.update ("_ := _" 62)
 section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
   sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
   
@@ -803,10 +804,14 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
     b!(j-1) = i \<and> (*needed?*)
     0 < j"
-  definition "I_in_cb' s j i \<equiv> (if i=0 \<or> s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else iblp1 s j \<le> iblp1 s (i-1) + 1)"
   definition "I_in_cb s j \<equiv> \<lambda>i.
-    (if j>1 then (strict_border (take (i-1) s) (take (j-1) s) \<and> I_in_cb' s j i) else i=0)"
-    print_theorems
+    if j>1(*swap branches*)
+    then strict_border (take (i-1) s) (take (j-1) s) \<and> (
+      if i=0 \<or> s!(i-1) = s!(j-1)(*swap branches*)
+      then iblp1 s j = i + 1
+      else iblp1 s j \<le> iblp1 s (i-1) + 1)
+    else i=0"
+  
   definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
     "computeBorders s = do {
     let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
@@ -815,12 +820,12 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j<length b) (\<lambda>(b,i,j). do {
       i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
         ASSERT (i-1 < length b);
-        i \<leftarrow> mop_list_get b (i-1);(*difference to let i = b!(i-1); ?*)
+        let i=b!(i-1);
         RETURN i
       }) i;
       let i=i+1;
       ASSERT (j < length b);
-      b \<leftarrow> mop_list_set b j i;
+      let b=b[j:=i];
       let j=j+1;
       RETURN (b,i,j)
     }) (b,i,j);
@@ -829,7 +834,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
   }"
   
   lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
-    unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def I_in_cb'_def
+    unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
     apply simp
     apply (refine_vcg
       WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
@@ -986,7 +991,6 @@ subsection\<open>Final refinement\<close>
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 subsection\<open>@{const computeBorders} using a function instead of a list\<close>
   (*
-  no_notation Ref.update ("_ := _" 62)
   definition "computeBorders' s \<equiv> do {
     (*Todo: Assertions*)
     let f=id;
