@@ -771,21 +771,6 @@ subsection\<open>Algorithm\<close>
     by (cases "j = 1") (simp_all add: weird_bracket_swap'''''''' take_Suc0)
   (*Todo: Needs to be pimped aswell*)
   
-  lemma loop_exit: (*or \<dots>_induct ?*)
-    assumes
-      "i < j"
-      "i = 0 \<or> s ! (i - Suc 0) = s ! (j - Suc 0)"
-      "j < length s"
-      "length b = length s"
-      "\<forall>jj<j. b ! jj = iblp1 s jj"
-    shows
-      "iblp1 s j = Suc i"
-  oops
-  
-  lemma "i < length s \<Longrightarrow> iblp1 s i = i \<Longrightarrow> \<exists>a. take i s = replicate i a"
-    (*apply (induction s i rule: above)*)
-    oops
-  
   thm border_positions
   corollary intrinsic_border_positions: "length (intrinsic_border w) = l
     \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
@@ -798,7 +783,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
     b!(j-1) = i \<and> (*needed?*)
     0 < j"
-  definition "I_in_cb' s j i \<equiv> (if s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else \<exists>ii\<le> iblp1 s (i-1). iblp1 s j = ii + 1)"
+  definition "I_in_cb' s j i \<equiv> (if s!(i-1) = s!(j-1) then iblp1 s j = i + 1 else iblp1 s j \<le> iblp1 s (i-1) + 1)"
   definition "I_in_cb s j \<equiv> \<lambda>i.
     (if j>1 then (strict_border (take (i-1) s) (take (j-1) s) \<and> I_in_cb' s j i) else i=0)"
     print_theorems
@@ -844,9 +829,9 @@ subsubsection\<open>Computing @{const iblp1}\<close>
         by (metis "1"(2) diff_is_0_eq' gr_zeroI iblp1_j0 le_numeral_extra(1))
       with 1 show ?case sorry
     qed
-    subgoal for b j i ii using strict_border_altdef
+    subgoal for b j i using strict_border_altdef
       by (metis Suc_leI Suc_n_not_le_n border_length_less length_take less_Suc_eq_le min_less_iff_conj nat_le_linear take_all)
-    subgoal for b j i ii
+    subgoal for b j i
     proof goal_cases
       case 1
       then have "i - 1 < j"
@@ -854,16 +839,16 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       with 1 show ?case
         by (smt I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans diff_is_0_eq' iblp1.simps(1) le_numeral_extra(1) less_Suc_eq_le less_trans_Suc numeral_2_eq_2)
     qed
-    subgoal for b j i ii sorry
+    subgoal for b j i sorry
     subgoal for b j i
     proof goal_cases
       case 1
       then have "i - 1 < j"
         by (smt One_nat_def border_length_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
       then show ?case
-        by (smt "1"(1) "1"(5) "1"(6) "1"(7) "1"(9) I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans cancel_comm_monoid_add_class.diff_cancel diff_is_0_eq' iblp1.simps(1) le_numeral_extra(1) less_Suc_eq_le less_trans_Suc numeral_2_eq_2)
+        by (smt "1"(1) "1"(10) "1"(5) "1"(6) "1"(8) I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans diff_is_0_eq' iblp1.simps(1) le_numeral_extra(1) less_Suc_eq_le less_trans_Suc numeral_2_eq_2)
     qed
-    subgoal for b j i ii
+    subgoal for b j i
     proof goal_cases
       case 1
       then have "i - 1 < j"
@@ -871,7 +856,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       with 1 show ?case sorry
     qed
     apply (smt One_nat_def border_length_less iblp1_le leD leI length_take less_Suc_eq_le min.absorb2 nz_le_conv_less order_less_le take_eq_Nil)
-    apply (smt diff_Suc_1 diff_is_0_eq iblp1.simps(1) iblp1_1 leI le_0_eq le_numeral_extra(1) length_greater_0_conv less_SucE less_imp_Suc_add nth_list_update_eq nth_list_update_neq)
+    apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
     by linarith
   
   corollary computeBorders_refine'[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
