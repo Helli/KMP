@@ -1052,26 +1052,6 @@ lemma "s \<noteq> []
   unfolding alternate_form by (fact kmp_correct)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
-subsection\<open>@{const computeBorders} using a function instead of a list\<close>
-(*
-definition "computeBorders' s \<equiv> do {
-  (*Todo: Assertions*)
-  let f=id;
-  let i=1;
-  let j=2;
-  (f,_,_) \<leftarrow> WHILEIT (I_out_cb s f i j) (\<lambda>(f,i,j). j\<le>length s) (\<lambda>(f,i,j). do {
-    i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      let i=f i;
-      RETURN i
-    }) i;
-    let i=i+1;
-    let f=f(j:=i);
-    RETURN (f,i,j)
-  }) (f,i,j);
-  
-  RETURN f
-}"
-*)
 section\<open>Notes and Tests\<close>
 
 term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
