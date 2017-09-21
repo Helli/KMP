@@ -289,7 +289,7 @@ subsection\<open>Auxiliary definitions\<close>
   lemma strict_border_altdef: "strict_border r w \<longleftrightarrow> border r w \<and> length r < length w"
     using border_length_r_less border_order.le_less by blast
   
-  lemma border_positions: "border r w \<Longrightarrow> \<forall>j<length r. w!j = w!(length w - length r + j)" unfolding border_def
+  lemma border_positions: "border r w \<Longrightarrow> \<forall>i<length r. w!i = w!(length w - length r + i)" unfolding border_def
     by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
   
   lemmas nth_stuff = nth_take nth_take_lemma nth_equalityI
@@ -845,7 +845,38 @@ subsubsection\<open>Computing @{const iblp1}\<close>
     apply (metis Suc_eq_plus1 generalisation less_Suc_eq_le less_imp_le_nat)
     apply (metis One_nat_def diff_is_0_eq iblp1_j0 less_not_refl2 linorder_not_less)
     apply (metis I_out_2_I_in One_nat_def Suc_to_right iblp1_j0 leI less_Suc0 less_Suc_eq_le less_antisym less_not_refl3 numeral_2_eq_2)
-    subgoal for b j sorry
+    subgoal for b j
+    proof goal_cases
+      case 1
+      then have bounds[simp]: "0 < j" "j \<le> length s" apply simp
+        using "1"(1) "1"(2) by linarith
+      show ?case
+      proof (rule ccontr, unfold Suc_eq_plus1)
+        assume "\<not>iblp1 s j \<le> iblp1 s (iblp1 s (j-1) - 1) + 1"
+        moreover have "iblp1 s j \<le> iblp1 s (j-1) + 1" using bounds
+          by (metis less_le_trans less_numeral_extra(3) list.size(3) sus')
+        ultimately consider
+          (tested) "iblp1 s j = iblp1 s (j-1) + 1" --\<open>This case will be easy.\<close> |
+          (skipped) "iblp1 s (iblp1 s (j-1) - 1) + 1 < iblp1 s j" "iblp1 s j \<le> iblp1 s (j-1)"
+          by linarith
+        then show False
+        proof cases
+          case tested
+          then have "iblp1 s (j-1) - 1 < length s" "iblp1 s (j-1) - 1 < iblp1 s (j-1)"
+            by (metis bounds intrinsic_border_less'' list.size(3) not_le) (use "1"(3) in linarith) 
+          moreover from tested have "iblp1 s j - 1 = iblp1 s (j-1)" by simp
+          moreover note border_positions[OF border_take_iblp1[of s j, unfolded this]]
+          ultimately have "take j s ! (iblp1 s (j-1) - 1) = s!(j-1)"
+            by simp (metis One_nat_def bounds(1) diff_Suc_less iblp1_le' le_add_diff_inverse2 len_greater_imp_nonempty less_or_eq_imp_le nth_take)
+          then have "s!(iblp1 s (j-1) - 1) = s!(j-1)"
+            by (metis "1"(3) One_nat_def Suc_leI Suc_lessI bounds(1) bounds(2) diff_is_0_eq' h iblp1_j0 not_gr_zero numeral_2_eq_2)
+            with "1"(4) show False..
+        next
+          case skipped
+          then show False sorry
+        qed
+      qed
+    qed
     subgoal for b j i using strict_border_altdef
       by (metis Suc_leI Suc_n_not_le_n border_length_less length_take less_Suc_eq_le min_less_iff_conj nat_le_linear take_all)
     subgoal for b j i
@@ -901,7 +932,39 @@ subsubsection\<open>Computing @{const iblp1}\<close>
       with 1 show ?case
         by (smt I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans iblp1_j0 leD less_Suc_eq neq0_conv numeral_2_eq_2)
     qed
-    subgoal for b j i sorry
+    subgoal for b j i
+    proof goal_cases
+      case 1
+      then have bounds[simp]: "0 < j" "j \<le> length s" apply simp
+        using "1"(1) "1"(3) by linarith
+      show ?case
+      proof (rule ccontr, unfold Suc_eq_plus1)
+        assume "\<not>iblp1 s j \<le> iblp1 s (b!(i-1) - 1) + 1"
+        moreover have "iblp1 s j \<le> b!(i-1) + 1" using bounds
+          (*when removing the duplicate proof: make this an assumption?*)
+          by (metis "1"(10) "1"(11) "1"(2) "1"(3) "1"(9) One_nat_def Suc_eq_plus1 Suc_pred border_length_less length_take less_Suc_eq_le min.absorb2 nz_le_conv_less order_less_le)
+        ultimately consider
+          (tested) "iblp1 s j = b!(i-1) + 1" --\<open>This case will be easy.\<close> |
+          (skipped) "iblp1 s (b!(i-1) - 1) + 1 < iblp1 s j" "iblp1 s j \<le> b!(i-1)"
+          by linarith
+        then show False
+        proof cases
+          case tested
+          then have "b!(i-1) - 1 < length s" "b!(i-1) - 1 < b!(i-1)"
+            by (metis "1"(10) add_diff_cancel_right' intrinsic_border_less'' less_imp_diff_less strict_border_def take_Nil) (use "1"(7) in linarith) 
+          moreover from tested have "iblp1 s j - 1 = b!(i-1)" by simp
+          moreover note border_positions[OF border_take_iblp1[of s j, unfolded this]]
+          ultimately have "take j s ! (b!(i-1) - 1) = s!(j-1)"
+            by simp (metis One_nat_def bounds(1) diff_Suc_less iblp1_le' le_add_diff_inverse2 len_greater_imp_nonempty less_or_eq_imp_le nth_take)
+          then have "s!(b!(i-1) - 1) = s!(j-1)"
+            by (metis \<open>b!(i-1) - 1 < b!(i-1)\<close> \<open>iblp1 s j - 1 = b!(i-1)\<close> bounds(1) iblp1_le' less_le_trans nth_take order_less_le take_eq_Nil)
+            with "1"(8) show False..
+        next
+          case skipped
+          then show False sorry
+        qed
+      qed
+    qed
     subgoal
       proof -
     fix ab :: "nat list" and baa :: nat and sa :: nat
