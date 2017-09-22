@@ -256,7 +256,7 @@ section\<open>Knuth–Morris–Pratt algorithm\<close>
 subsection\<open>Auxiliary definitions\<close>
 text\<open>Borders of words\<close>
 definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
-definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> xs \<noteq> ys"(*Try altdef here?*)
+definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> length xs < length ys"
 
 interpretation border_order: order border strict_border
   by standard (auto simp: border_def suffix_def strict_border_def)
@@ -271,12 +271,12 @@ lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r
   and strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
   and strict_border_imp_nonempty: "strict_border r w \<Longrightarrow> w \<noteq> []"
   and strict_border_prefix_suffix: "strict_border r w \<longleftrightarrow> strict_prefix r w \<and> strict_suffix r w"
-  by (auto simp: strict_border_def border_def)
+  by (auto simp: border_order.order.strict_iff_order border_def)
 
 lemma border_length_le: "border r w \<Longrightarrow> length r \<le> length w"
   unfolding border_def by (simp add: prefix_length_le)
 lemma border_length_less: "strict_border r w \<Longrightarrow> length r < length w"
-  by (auto simp: strict_border_def border_def prefix_def)
+  by (simp add: strict_border_def)
 
 lemma border_unique: "\<lbrakk>border r w; border r' w; length r = length r'\<rbrakk> \<Longrightarrow> r = r'"
   unfolding border_def by (metis order_mono_setup.refl prefix_length_prefix prefix_order.eq_iff)
@@ -286,9 +286,6 @@ lemma border_lengths_differ: "\<lbrakk>border r w; border r' w; r\<noteq>r'\<rbr
 
 lemma border_length_r_less: "\<forall>r. strict_border r w \<longrightarrow> length r < length w"
   using border_length_less by auto
-
-lemma strict_border_altdef: "strict_border r w \<longleftrightarrow> border r w \<and> length r < length w"
-  using border_length_r_less border_order.le_less by blast
 
 lemma border_positions: "border r w \<Longrightarrow> \<forall>i<length r. w!i = w!(length w - length r + i)" unfolding border_def
   by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
@@ -662,7 +659,7 @@ lemma border_step: "border r w \<longleftrightarrow> border (r@[w!length r]) (w@
   done
 
 corollary strict_border_step: "strict_border r w \<longleftrightarrow> strict_border (r@[w!length r]) (w@[w!length r])"
-  unfolding strict_border_def using border_step by blast(*or use proof above*)
+  unfolding strict_border_def using border_step by auto(*or use proof above*)
 
 corollary strict_border_step': "i-1 < j-1 \<Longrightarrow> i-1 < length s \<Longrightarrow> strict_border (take (i - 1) s) (take (j-1) s) \<longleftrightarrow> strict_border (take (i-1) s @ [s!(i-1)]) (take (j-1) s @ [s!(i-1)])"
   using strict_border_step[of "take (i-1) s" "take (j-1) s", simplified, folded One_nat_def]
@@ -681,7 +678,7 @@ proof -
   then have "strict_border (intrinsic_border w) w"
     by (fact intrinsic_borderI')
   with \<open>2 \<le> length w\<close> have "strict_border (butlast (intrinsic_border w)) (butlast w)"
-    by (metis add_le_imp_le_diff border_butlast butlast.simps(1) length_butlast list.size(3) not_one_le_zero one_add_one strict_border_butlast strict_border_def)
+    by (metis One_nat_def border_bot.bot.not_eq_extremum butlast.simps(1) len_greater_imp_nonempty length_butlast lessI less_le_trans numerals(2) strict_border_butlast zero_less_diff)
   then have "length (butlast (intrinsic_border w)) \<le> length (intrinsic_border (butlast w))"
     using intrinsic_border_max by blast
   then show ?thesis
@@ -953,7 +950,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
       proof cases
         case tested
         then have "b!(i-1) - 1 < length s" "b!(i-1) - 1 < b!(i-1)"
-          by (metis "1"(10) add_diff_cancel_right' intrinsic_border_less'' less_imp_diff_less strict_border_def take_Nil) (use "1"(7) in linarith)
+          by (metis bounds diff_add_inverse2 intrinsic_border_less'' length_greater_0_conv less_imp_diff_less less_le_trans) (use "1"(7) in linarith)
         moreover from tested have "iblp1 s j - 1 = b!(i-1)" by simp
         moreover note border_positions[OF border_take_iblp1[of s j, unfolded this]]
         ultimately have "take j s ! (b!(i-1) - 1) = s!(j-1)"
