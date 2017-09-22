@@ -386,7 +386,7 @@ fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
   "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
 
-lemma iblp1_j0: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
+lemma iblp1_j0[simp]: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
   by (cases j) simp_all
 
 lemma iblp1_le:
@@ -851,7 +851,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
     WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
     )
-  apply (vc_solve simp:(*? ? ?*)iblp1_j0, fold One_nat_def)
+  apply (vc_solve, fold One_nat_def)
   apply (safe intro!: I_out_2_I_in; auto)
   apply (metis Suc_eq_plus1 generalisation less_Suc_eq_le less_imp_le_nat)
   apply (metis One_nat_def diff_is_0_eq iblp1_j0 less_not_refl2 linorder_not_less)
