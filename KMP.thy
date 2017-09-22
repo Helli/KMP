@@ -269,6 +269,7 @@ lemma sublist_unique: "\<lbrakk>sublist_at s t i; sublist_at s' t i; length s = 
 
 lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r w"
   and strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
+  and strict_border_imp_nonempty: "strict_border r w \<Longrightarrow> w \<noteq> []"
   and strict_border_prefix_suffix: "strict_border r w \<longleftrightarrow> strict_prefix r w \<and> strict_suffix r w"
   by (auto simp: strict_border_def border_def)
 
@@ -1016,24 +1017,22 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
       qed
     qed
   qed
-  subgoal
-    proof -
-  fix ab :: "nat list" and baa :: nat and sa :: nat
-  assume a1: "1 < baa"
-  assume a2: "baa < length ab"
-  assume a3: "Suc (length s) = length ab"
-  assume a4: "\<forall>jj<baa. ab ! jj = iblp1 s jj"
-  assume a5: "strict_border (take (sa - 1) s) (take (baa - 1) s)"
-  assume a6: "sa - 1 < length ab"
-  assume a7: "0 < sa"
-  have f8: "iblp1 s (sa - 1) < Suc (sa - 1)"
-    using a3 a2 a1 by (metis One_nat_def iblp1_le length_ge_1_conv less_Suc_eq_le less_imp_le_nat min_def_raw min_less_iff_conj)
-  have "length (take (sa - 1) s) < length (take (baa - 1) s)"
-    using a5 by (metis border_length_r_less)
-  then show "ab ! (sa - 1) < sa"
-    using f8 a7 a6 a4 a3 by (metis (no_types) Suc_diff_1 diff_le_self length_take less_Suc_eq_le min.absorb2 min_less_iff_conj)
-      qed
-       apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
+  subgoal for b j i
+  proof -
+    fix b :: "nat list" and j :: nat and i :: nat
+    assume a3: "Suc (length s) = length b"
+    assume a4: "\<forall>jj<j. b ! jj = iblp1 s jj"
+    assume a5: "strict_border (take (i - 1) s) (take (j - 1) s)"
+    assume a6: "i - 1 < length b"
+    assume a7: "0 < i"
+    have f8: "iblp1 s (i - 1) < Suc (i - 1)"
+      by (metis a5 border_order.less_imp_neq iblp1_le less_Suc_eq_le take_eq_Nil)
+    have "length (take (i - 1) s) < length (take (j - 1) s)"
+      using a5 by (metis border_length_r_less)
+    then show "b ! (i - 1) < i"
+      using f8 a7 a6 a4 a3 by (metis (no_types) Suc_diff_1 diff_le_self length_take less_Suc_eq_le min.absorb2 min_less_iff_conj)
+  qed
+  apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
   by linarith
 
 corollary computeBorders_refine'[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
