@@ -268,8 +268,8 @@ lemma sublist_unique: "\<lbrakk>sublist_at s t i; sublist_at s' t i; length s = 
   by (metis nth_equalityI sublist_all_positions)
 
 lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r w"
-  by (auto simp: strict_border_def border_def)
-lemma strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
+  and strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
+  and strict_border_prefix_suffix: "strict_border r w \<longleftrightarrow> strict_prefix r w \<and> strict_suffix r w"
   by (auto simp: strict_border_def border_def)
 
 lemma border_length_le: "border r w \<Longrightarrow> length r \<le> length w"
@@ -305,7 +305,8 @@ lemma all_positions_suffix_take: "\<lbrakk>i \<le> length w; i \<le> length x;
     \<Longrightarrow> suffix (take i x) w"
   by (metis all_positions_drop_length_take suffix_drop)
 
-thm suffix_drop take_is_prefix (* That naming -.- *)
+lemma suffix_butlast: "suffix xs ys \<Longrightarrow> suffix (butlast xs) (butlast ys)"
+  by (metis Nil_suffix append_butlast_last_id butlast.simps(1) snoc_suffix_snoc suffix_Nil)
 
 lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> border (take l w) w"
   by (cases "l < length w") (simp_all add: border_def all_positions_suffix_take take_is_prefix)
@@ -355,8 +356,7 @@ lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_borde
 
 lemmas intrinsic_borderI = arg_max_natI[OF _ border_length_r_less, folded intrinsic_border_def]
 
-lemmas sigh[simp] = border_bot.bot.not_eq_extremum[THEN iffD1]
-lemmas intrinsic_borderI' = sigh[THEN intrinsic_borderI]
+lemmas intrinsic_borderI' = border_bot.bot.not_eq_extremum[THEN iffD1, THEN intrinsic_borderI]
 
 lemmas intrinsic_border_max = arg_max_nat_le[OF _ border_length_r_less, folded intrinsic_border_def]
 
@@ -680,7 +680,7 @@ proof -
   then have "strict_border (intrinsic_border w) w"
     by (fact intrinsic_borderI')
   with \<open>2 \<le> length w\<close> have "strict_border (butlast (intrinsic_border w)) (butlast w)"
-    by (metis One_nat_def butlast.simps(1) diff_is_0_eq le_simps(3) length_0_conv length_butlast not_less numeral_2_eq_2 sigh strict_border_butlast)
+    by (metis add_le_imp_le_diff border_butlast butlast.simps(1) length_butlast list.size(3) not_one_le_zero one_add_one strict_border_butlast strict_border_def)
   then have "length (butlast (intrinsic_border w)) \<le> length (intrinsic_border (butlast w))"
     using intrinsic_border_max by blast
   then show ?thesis
@@ -885,7 +885,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     then have "i - 1 < j"
       by (smt One_nat_def border_length_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
     with 1 show ?case
-      by (metis border_bot.bot.extremum_strict sigh)
+      by (metis border_bot.bot.extremum_strict border_bot.bot.not_eq_extremum)
   qed
   subgoal for b j i
     by (smt border_length_less diff_Suc_1 diff_is_0_eq' eq_diff_iff iblp1_j0 le_numeral_extra(4) length_take less_Suc_eq less_Suc_eq_0_disj less_Suc_eq_le min.absorb2)
@@ -906,7 +906,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
     then have duh: "i - 1 < length s"
       using "1"(1) "1"(5) by linarith
     then have i'_lower: "iblp1 s (i-1) - 1 < j - 1" "iblp1 s (i-1) - 1 < length s "
-      by (metis \<open>i - 1 < j - 1\<close> iblp1_le le_less_trans len_greater_imp_nonempty less_imp_diff_less)+
+      using \<open>i-1 < j-1\<close> by (metis iblp1_le le_less_trans len_greater_imp_nonempty less_imp_diff_less)+
     have "border (take (iblp1 s (i-1) - 1) s) (take (i-1) s)"
       by (fact border_take_iblp1)
     also note \<open>strict_border (take (i-1) s) (take (j-1) s)\<close>
@@ -944,14 +944,15 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
         (*when removing the duplicate proof: make this an assumption?*)
         by (metis "1"(10) "1"(11) "1"(2) "1"(3) "1"(9) One_nat_def Suc_eq_plus1 Suc_pred border_length_less length_take less_Suc_eq_le min.absorb2 nz_le_conv_less order_less_le)
       ultimately consider
-        (tested) "iblp1 s j = b!(i-1) + 1" --\<open>This case will be easy.\<close> |
+        (tested) "iblp1 s j = b!(i-1) + 1" --\<open>This contradicts @{thm "1"(8)}\<close> |
         (skipped) "iblp1 s (b!(i-1) - 1) + 1 < iblp1 s j" "iblp1 s j \<le> b!(i-1)"
+          --\<open>This contradicts @{thm iblp1_max[of "b!(i-1) - 1" s]}\<close>
         by linarith
       then show False
       proof cases
         case tested
         then have "b!(i-1) - 1 < length s" "b!(i-1) - 1 < b!(i-1)"
-          by (metis "1"(10) add_diff_cancel_right' intrinsic_border_less'' less_imp_diff_less strict_border_def take_Nil) (use "1"(7) in linarith) 
+          by (metis "1"(10) add_diff_cancel_right' intrinsic_border_less'' less_imp_diff_less strict_border_def take_Nil) (use "1"(7) in linarith)
         moreover from tested have "iblp1 s j - 1 = b!(i-1)" by simp
         moreover note border_positions[OF border_take_iblp1[of s j, unfolded this]]
         ultimately have "take j s ! (b!(i-1) - 1) = s!(j-1)"
@@ -961,7 +962,57 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
           with "1"(8) show False..
       next
         case skipped
-        then show False sorry
+        let ?impossible = "take (iblp1 s j - 2) s"
+        let ?i' = "take (b!(i-1) - 1) s"
+        have "i - 1 < j"
+          by (metis (no_types, lifting) "1"(10) "1"(2) "1"(3) One_nat_def Suc_pred border_length_less bounds(1) bounds(2) length_take less_Suc_eq_le min.absorb2 nz_le_conv_less order_less_le)
+        then have "b!(i-1) \<le> i - 1"
+          by (metis "1"(9) bounds(1) bounds(2) iblp1_le less_le_trans less_numeral_extra(3) list.size(3))
+        with \<open>i - 1 < j\<close> have [simp]: "b!(i-1) - 1 < j" by simp
+        have [simp]: "length (take j s) = j"
+          by (metis (no_types) bounds(2) length_take min.absorb2)
+        have "iblp1 s j - 2 < b!(i-1) - 1"
+          using skipped by linarith
+        then have less_s: "iblp1 s j - 2 < length s" "b!(i-1) - 1 < length s"
+          using \<open>b ! (i-1) - 1 < j\<close> bounds(2) by linarith+
+        then have strict: "length ?impossible < length ?i'"
+          using \<open>iblp1 s j - 2 < b!(i-1) - 1\<close> by auto
+        moreover {
+          have "prefix ?impossible (take j s)"
+            using prefix_length_prefix take_is_prefix
+            by (metis (no_types, lifting) \<open>b!(i-1) - 1 < j\<close> \<open>iblp1 s j - 2 < b!(i-1) - 1\<close> \<open>length (take j s) = j\<close> dual_order.order_iff_strict length_take less_s(1) min_simps(2) order.strict_trans)
+          moreover have "prefix ?i' (take j s)"
+            by (metis (no_types) \<open>b!(i-1) - 1 < j\<close> bounds(2) length_take less_le_trans less_or_eq_imp_le min.absorb2 prefix_length_prefix take_is_prefix)
+          ultimately have "prefix ?impossible ?i'"
+            using \<open>length ?impossible < length ?i'\<close> less_imp_le_nat prefix_length_prefix by blast
+        } moreover {
+          have "suffix (take (iblp1 s j - 1) s) (take j s)" using border_take_iblp1
+            by (auto simp: border_def border_take_iblp1)
+          note suffix_butlast[OF this]
+          then have "suffix ?impossible (take (j-1) s)"
+            by (metis One_nat_def Suc_to_right bounds(2) butlast_take diff_Suc_Suc intrinsic_border_less'' len_greater_imp_nonempty less_imp_Suc_add less_or_eq_imp_le less_s(1) numeral_2_eq_2 skipped(1))
+          moreover {
+            have "border ?i' (take (i-1) s)"
+              using "1"(9) \<open>i - 1 < j\<close> border_take_iblp1 by simp
+            also note "1"(10)
+            finally have "suffix ?i' (take (j-1) s)"
+              unfolding strict_border_def border_def by simp
+          }
+          ultimately have "suffix ?impossible (take (j-1) s)" "suffix ?i' (take (j-1) s)".
+          from suffix_length_suffix[OF this strict[THEN less_imp_le]]
+            have "suffix ?impossible ?i'".
+        }
+        ultimately have "strict_border ?impossible ?i'"
+          using strict_border_altdef[unfolded border_def] by blast
+        note iblp1_max[OF _ this]
+        then have "length (take (iblp1 s j - 2) s) + 1 \<le> iblp1 s (b!(i-1) - 1)"
+          using less_imp_le_nat less_s(2) by blast
+        then have "iblp1 s j - 1 \<le> iblp1 s (b!(i-1) - 1)"
+          by (simp add: less_s(1))
+        then have "iblp1 s j \<le> iblp1 s (b!(i-1) - 1) + 1"
+          using le_diff_conv by blast
+        with skipped(1) show False
+          by linarith
       qed
     qed
   qed
