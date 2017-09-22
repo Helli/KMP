@@ -310,7 +310,7 @@ lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarr
   by (cases "l < length w") (simp_all add: border_def all_positions_suffix_take take_is_prefix)
 
 lemma positions_strict_border: "l < length w \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> strict_border (take l w) w"
-  by (simp add: strict_border_altdef border_def all_positions_suffix_take take_is_prefix)
+  by (simp add: positions_border strict_border_def)
 
 subsection\<open>@{const arg_min} and @{const arg_max}\<close>
 lemma arg_max_natI2:
@@ -645,7 +645,7 @@ lemma border_butlast: "border r w \<Longrightarrow> border (butlast r) (butlast 
   done
 
 corollary strict_border_butlast: "r \<noteq> [] \<Longrightarrow> strict_border r w \<Longrightarrow> strict_border (butlast r) (butlast w)"
-  unfolding strict_border_altdef by (auto simp: border_butlast less_diff_conv)
+  unfolding strict_border_def by (simp add: border_butlast less_diff_conv)
 
 lemma border_take: "j \<le> length r \<Longrightarrow> border r w \<Longrightarrow> border (take j r) (take j w)"
   apply (auto simp: border_def)
@@ -875,8 +875,8 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
       qed
     qed
   qed
-  subgoal for b j i using strict_border_altdef
-    by (metis Suc_leI Suc_n_not_le_n border_length_less length_take less_Suc_eq_le min_less_iff_conj nat_le_linear take_all)
+  subgoal for b j i using strict_border_def
+    by (metis Suc_leI Suc_n_not_le_n length_take less_Suc_eq_le min_less_iff_conj nat_le_linear take_all)
   subgoal for b j i
   proof goal_cases
     case 1
@@ -1001,7 +1001,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
             have "suffix ?impossible ?i'".
         }
         ultimately have "strict_border ?impossible ?i'"
-          using strict_border_altdef[unfolded border_def] by blast
+          unfolding strict_border_def[unfolded border_def] by blast
         note iblp1_max[OF _ this]
         then have "length (take (iblp1 s j - 2) s) + 1 \<le> iblp1 s (b!(i-1) - 1)"
           using less_imp_le_nat less_s(2) by blast
