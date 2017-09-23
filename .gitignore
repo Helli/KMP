@@ -49,3 +49,4 @@ Temporary Items
 *.thy~
 refine_slides.pdf
 FPMiS.pdf
+output/*

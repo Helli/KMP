@@ -1,3 +1,4 @@
+
 theory KMP
   imports Refine_Imperative_HOL.IICF
     "HOL-Library.Sublist"
@@ -11,6 +12,7 @@ lemma nat_min_absorb_Suc[simp]: (*rm?*)
   by simp_all
 
 section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
+(*No longer needed, using replicate instead*)
 sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
 
 definition array_upt :: "nat \<Rightarrow> nat \<Rightarrow> nat array Heap" where
@@ -65,8 +67,6 @@ fun sublist_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow>
   "sublist_at [] t 0 \<longleftrightarrow> True" |
   "sublist_at _ [] _ \<longleftrightarrow> False"
 
-export_code sublist_at(*fails*)
-
 lemmas [code del] = t1 t2
 lemma [code]:
   "sublist_at ss (t#ts) i \<longleftrightarrow>
@@ -74,7 +74,7 @@ lemma [code]:
   "sublist_at ss [] i \<longleftrightarrow> ss=[] \<and> i=0"
   by (cases ss; cases i; auto)+
 
-export_code sublist_at(*works*)
+export_code sublist_at(*test*)
 
 text\<open>For all relevant cases, both definitions agree:\<close>
 lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> sublist_at' s t i"
@@ -122,7 +122,7 @@ lemma sublist_all_positions:
   by (induction s t i rule: sublist_at.induct)
     (auto simp: nth_Cons')
 
-subsection\<open>Other characterisations:\<close>
+subsection\<open>Other characterisations\<close>
 fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
   where
   "slice (x#xs) (Suc n) l = slice xs n l"
@@ -433,7 +433,7 @@ lemma "p576 et seq":
     "i' = i + (j + 1 - iblp1 s j)"
     "j' = max 0 (iblp1 s j - 1)"
   shows
-    sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed? (≙Sinn von S.576?)*) and
+    sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed?*) and
     i_increase: "i' > i"
   using assignments by (simp_all add: iblp1_le[OF assms(1), THEN le_imp_less_Suc])
 
@@ -447,7 +447,7 @@ definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
 text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
 
 subsection\<open>Algorithm\<close>
-text\<open>First, we use the non-evaluable function @{const "iblp1"} directly:}\<close>
+text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
 definition "kmp s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
