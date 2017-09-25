@@ -256,6 +256,7 @@ lemma "s \<noteq> []
   done
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
+
 subsection\<open>Auxiliary definitions\<close>
 text\<open>Borders of words\<close>
 definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
@@ -421,6 +422,7 @@ definition "kmp s t \<equiv> do {
   let j=0;
   let pos=None;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+    ASSERT (i + length s \<le> length t);
     (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
@@ -560,8 +562,9 @@ definition "kmp1 s t \<equiv> do {
   let j=0;
   let pos=None;
   borders \<leftarrow> computeBordersSpec (butlast s);(*At the last char, we abort instead.*)
-  (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-    (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+  (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+    ASSERT (i + length s \<le> length t);
+    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -989,9 +992,61 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
   apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
   by linarith
 
-corollary computeBorders_refine'[refine]: "(s,s') \<in> Id \<Longrightarrow> computeBorders s \<le> \<Down> Id (computeBordersSpec s')"
-  by (simp add: computeBorders_refine)
+  
+definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
+  "computeBorders2 s = do {
+  let b=replicate (length s) 0;(*only the first 0 is needed*)
+  let i=0;
+  let j=1;
+  (b,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
+    ASSERT (j < length b);
+    i \<leftarrow> WHILEIT (I_in_cb (butlast s) j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      ASSERT (i-1 < length b);
+      let i=b!(i-1);
+      RETURN i
+    }) i;
+    let i=i+1;
+    ASSERT (j < length b);
+    let b=b[j:=i];
+    let j=j+1;
+    RETURN (b,i,j)
+  }) (b,i,j);
+  
+  RETURN b
+}"
 
+lemma computeBorders_inner_bounds: 
+  assumes "I_out_cb s (b,ix,j)"
+  assumes "j < length b"
+  assumes "I_in_cb s j i"
+  shows "i-1 < length s" "j-1 < length s"
+  using assms
+  apply (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
+  subgoal
+    by (metis One_nat_def border_order.less_irrefl diff_Suc_Suc diff_zero intrinsic_border_less'' less_imp_diff_less take.simps(1))
+  subgoal 
+    by (metis border_length_r_less length_take less_imp_le_nat min_simps(2) not_less take_all)
+  done
+  
+lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> computeBorders2 s \<le> \<Down>Id (computeBorders s')"
+  unfolding computeBorders2_def computeBorders_def
+  apply (refine_rcg)
+  apply (refine_dref_type)
+  apply (vc_solve simp: in_br_conv)
+  subgoal by (metis Suc_pred length_greater_0_conv replicate_Suc)
+  subgoal by (metis One_nat_def computeBorders_inner_bounds nth_butlast)
+  done
+
+  
+corollary computeBorders2_refine'[refine]: 
+  assumes "(s,s') \<in> br butlast (op \<noteq>[])"
+  shows "computeBorders2 s \<le> \<Down> Id (computeBordersSpec s')"
+proof -
+  note computeBorders2_ref1
+  also note computeBorders_refine
+  finally show ?thesis using assms by simp
+qed
+  
 subsection\<open>Final refinement\<close>
 text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
 definition "kmp2 s t \<equiv> do {
@@ -999,9 +1054,10 @@ definition "kmp2 s t \<equiv> do {
   let i=0;
   let j=0;
   let pos=None;
-  borders \<leftarrow> computeBorders (butlast s);
-  (_,_,pos) \<leftarrow> WHILET (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-    (j,pos) \<leftarrow> WHILET (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+  borders \<leftarrow> computeBorders2 s;
+  (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+    ASSERT (i + length s \<le> length t \<and> pos=None);
+    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -1016,13 +1072,13 @@ definition "kmp2 s t \<equiv> do {
   RETURN pos
 }"
 
-text\<open>Using @{thm [source] computeBorders_refine'} (it has @{attribute refine}), the proof is trivial:\<close>
+text\<open>Using @{thm [source] computeBorders2_refine'} (it has @{attribute refine}), the proof is trivial:\<close>
 lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
   apply refine_rcg
   apply refine_dref_type
-  apply vc_solve
+  apply (vc_solve simp: in_br_conv)
   done
 
 lemma kmp2_correct: "s \<noteq> []
@@ -1107,5 +1163,75 @@ lemma ex2: "border a ''aa'' \<longleftrightarrow> a\<in>{
   apply (auto simp: border_def)
    apply (simp add: suffix_Cons)+
   done
+
+
+section \<open>Refinement to Imperative/HOL\<close>
+
+lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by simp
+
+lemmas in_bounds_aux = computeBorders_inner_bounds[of "butlast s" for s, simplified]
+
+sepref_definition computeBorders2_impl is computeBorders2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
+  unfolding computeBorders2_def
+  supply in_bounds_aux[dest]
+  supply eq_id_param[where 'a='a, sepref_import_param]
+  apply (rewrite array_fold_custom_replicate)
+  by sepref
+  
+  
+  
+declare computeBorders2_impl.refine[sepref_fr_rules]
+
+sepref_register computeBorders
+
+thm Sepref_Translate.WHILEIT_comb
+
+lemma kmp_inner_in_bound:
+  assumes "I_outer s t (i, jxx, None)"
+  assumes "i + length s \<le> length t"
+  assumes "I_in_nap s t i (j,None)"
+  shows "i + j < length t" "j < length s"
+  using assms
+  by (auto simp: I_outer_def I_in_nap_def)
+  
+sepref_definition kmp_impl is "uncurry kmp2" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
+  unfolding kmp2_def
+  apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" conj_commute)
+  apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" short_circuit_conv)
+  supply kmp_inner_in_bound[dest]
+  supply option.splits[split]
+  supply eq_id_param[where 'a='a, sepref_import_param]
+  by sepref
+
+
+export_code kmp_impl in SML_imp module_name KMP
+
+
+thm kmp2_correct
+lemma kmp2_correct':
+  "(uncurry kmp2,uncurry (\<lambda>s t. SPEC (\<lambda>
+    None \<Rightarrow> \<nexists>i. sublist_at s t i |
+    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i')))) \<in> [\<lambda>(s,t). s\<noteq>[]]\<^sub>f Id \<times>\<^sub>r Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+  apply (intro frefI nres_relI; clarsimp)
+  apply (rule order_trans)
+  apply (rule kmp2_correct)
+  apply (auto split: option.split)
+  done
+    
+
+lemmas kmp_impl_correct' = kmp_impl.refine[FCOMP kmp2_correct']
+
+theorem kmp2_impl_correct:
+  "s\<noteq>[] \<Longrightarrow> < arl_assn id_assn s si * arl_assn id_assn t ti > 
+       kmp_impl si ti 
+   <\<lambda>r. arl_assn id_assn s si * arl_assn id_assn t ti * \<up>(
+      case r of None \<Rightarrow>  \<nexists>i. sublist_at s t i
+              | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not> sublist_at s t i')
+    )>\<^sub>t"
+  by (sep_auto 
+    simp: pure_def 
+    split: option.split
+    heap:  kmp_impl_correct'[THEN hfrefD, THEN hn_refineD, of "(s,t)" "(si,ti)", simplified])
+
 
 end
