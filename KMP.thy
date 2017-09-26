@@ -216,7 +216,7 @@ lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
   subgoal by (meson le_diff_conv2 leI order_trans sublist_lengths)
   done
 
-text\<open>The first precondition cannot be removed without an extra branch: If @{term \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{term \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{term \<open>i \<le> length t - length s\<close>} in the first while-condition to @{term \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
+text\<open>The first precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{prop \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{prop \<open>i \<le> length t - length s\<close>} in the first while-condition to @{prop \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
 
 subsection\<open>A variant returning the position\<close>
 definition "I_out_nap s t \<equiv> \<lambda>(i,j,pos).
@@ -372,7 +372,7 @@ lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longright
 
 text\<open>"Intrinsic border length plus one" for prefixes\<close>
 fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-  "iblp1 s 0 = 0"\<comment>\<open>This increments the compare position while \<^term>\<open>j=0\<close>\<close> |
+  "iblp1 s 0 = 0"\<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
   "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
 
@@ -836,9 +836,9 @@ lemma skipping_ok:
     next
       case skipped
       let ?border = "take (iblp1 s (i-1) - 1) s"
-        \<comment>\<open>This could not be extended to a border of \<^term>\<open>take j s\<close> due to the mismatch.\<close>
+        \<comment>\<open>This could not be extended to a border of @{term \<open>take j s\<close>} due to the mismatch.\<close>
       let ?impossible = "take (iblp1 s j - 2) s"
-        \<comment>\<open>A strict border longer than @{term "intrinsic_border ?border"}, a contradiction.\<close>
+        \<comment>\<open>A strict border longer than @{term \<open>intrinsic_border ?border\<close>}, a contradiction.\<close>
       have "i - 1 \<le> length s"
         by (metis One_nat_def assms(5) border_length_le bounds diff_diff_cancel diff_is_0_eq' diff_le_self leD len_greater_imp_nonempty length_take less_Suc_eq_le less_imp_le_nat less_le_trans list.size(3) min_simps(2) nat_le_linear nat_neq_iff take_all)
       from border_take_lengths[OF this assms(5)] have le[simp]: "i - 1 \<le> j - 1".
@@ -897,7 +897,7 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
   apply simp
   apply (refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
-    WHILEIT_rule[where R="measure id"]\<comment>\<open>\<^term>\<open>i::nat\<close> decreases with every iteration.\<close>
+    WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
   apply (vc_solve, fold One_nat_def)
   apply (safe intro!: I_out_2_I_in; auto)
@@ -998,10 +998,10 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
   by linarith
 
 text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
-instead of @{term "butlast s"} (it still only computes on @{term "butlast s"}).\<close>
+instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
 definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
   "computeBorders2 s = do {
-  let b=replicate (length s) 0;(*only the first 0 is needed*)
+  let b=replicate (length s) 0;
   let i=0;
   let j=1;
   (b,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
