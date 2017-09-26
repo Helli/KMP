@@ -1267,6 +1267,12 @@ ML_val \<open>
   val test1 = kmp "anas" ("bananas")
   val test2 = kmp "" ("bananas")
   val test3 = kmp "hide_fact" (File.read @{file "~~/src/HOL/Main.thy"})
+  (*some(~370) almost(19char)-matches \<longrightarrow> bad for nap*)
+  val test4 = kmp "\\newcommand{\\isasymproof" (File.read @{file "~~/lib/texinputs/isabellesym.sty"})
+  (*pattern large \<longrightarrow> bad for kmp*)
+  val test5 = kmp (File.read @{file "~~/src/Pure/Thy/thy_output.ML"}) "anystring"
+
+  (*todo: example where the alphabet is infinite or where equality takes long*)
 \<close>
 
 
