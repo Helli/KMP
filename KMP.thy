@@ -992,7 +992,8 @@ lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
   apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
   by linarith
 
-  
+text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
+instead of @{term "butlast s"} (it still only computes on @{term "butlast s"}).\<close>
 definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
   "computeBorders2 s = do {
   let b=replicate (length s) 0;(*only the first 0 is needed*)
