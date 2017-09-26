@@ -2,6 +2,7 @@
 theory KMP
   imports Refine_Imperative_HOL.IICF
     "HOL-Library.Sublist"
+    "HOL-Library.Code_Char"
 begin
 
 declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
@@ -165,6 +166,10 @@ qed auto
 
 corollary sublist_at_iff_sublist: "(\<exists>i. sublist_at s t i) \<longleftrightarrow> Sublist.sublist s t"
   by (simp add: sublist_at_altdef Sublist.sublist_def)
+
+lemma sublist_at_empty[simp]: "sublist_at [] ys 0"
+  by auto
+
 
 section\<open>Naive algorithm\<close>
 
@@ -1112,6 +1117,18 @@ lemma "s \<noteq> []
     | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i)"
   unfolding alternate_form by (fact kmp_correct)
 
+
+definition "kmp3 s t \<equiv> do {
+  if s=[] then RETURN (Some 0) else kmp2 s t
+}"
+
+lemma kmp3_correct: "kmp3 s t \<le> SPEC (\<lambda>
+    None \<Rightarrow> \<nexists>i. sublist_at s t i |
+    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+  unfolding kmp3_def
+  by (refine_vcg kmp2_correct) (auto)
+
+
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 section\<open>Notes and Tests\<close>
 
@@ -1195,8 +1212,8 @@ lemma kmp_inner_in_bound:
   using assms
   by (auto simp: I_outer_def I_in_nap_def)
   
-sepref_definition kmp_impl is "uncurry kmp2" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
-  unfolding kmp2_def
+sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
+  unfolding kmp3_def kmp2_def
   apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" conj_commute)
   apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" short_circuit_conv)
   supply kmp_inner_in_bound[dest]
@@ -1208,22 +1225,22 @@ sepref_definition kmp_impl is "uncurry kmp2" :: "(arl_assn id_assn)\<^sup>k *\<^
 export_code kmp_impl in SML_imp module_name KMP
 
 
-thm kmp2_correct
-lemma kmp2_correct':
-  "(uncurry kmp2,uncurry (\<lambda>s t. SPEC (\<lambda>
+thm kmp3_correct
+lemma kmp3_correct':
+  "(uncurry kmp3,uncurry (\<lambda>s t. SPEC (\<lambda>
     None \<Rightarrow> \<nexists>i. sublist_at s t i |
-    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i')))) \<in> [\<lambda>(s,t). s\<noteq>[]]\<^sub>f Id \<times>\<^sub>r Id \<rightarrow> \<langle>Id\<rangle>nres_rel"
+    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i')))) \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
   apply (intro frefI nres_relI; clarsimp)
   apply (rule order_trans)
-  apply (rule kmp2_correct)
+  apply (rule kmp3_correct)
   apply (auto split: option.split)
   done
     
 
-lemmas kmp_impl_correct' = kmp_impl.refine[FCOMP kmp2_correct']
+lemmas kmp_impl_correct' = kmp_impl.refine[FCOMP kmp3_correct']
 
-theorem kmp2_impl_correct:
-  "s\<noteq>[] \<Longrightarrow> < arl_assn id_assn s si * arl_assn id_assn t ti > 
+theorem kmp3_impl_correct:
+  "< arl_assn id_assn s si * arl_assn id_assn t ti > 
        kmp_impl si ti 
    <\<lambda>r. arl_assn id_assn s si * arl_assn id_assn t ti * \<up>(
       case r of None \<Rightarrow>  \<nexists>i. sublist_at s t i
@@ -1233,6 +1250,25 @@ theorem kmp2_impl_correct:
     simp: pure_def 
     split: option.split
     heap:  kmp_impl_correct'[THEN hfrefD, THEN hn_refineD, of "(s,t)" "(si,ti)", simplified])
+
+
+definition "kmp_string_impl \<equiv> kmp_impl :: (char array \<times> nat) \<Rightarrow> _"
+
+ML_val \<open>
+  open File
+
+\<close>
+
+ML_val \<open>
+  fun str2arl s = (Array.fromList (String.explode s), @{code nat_of_integer} (String.size s))
+  fun kmp s t = map_option (@{code integer_of_nat}) (@{code kmp_string_impl} (str2arl s) (str2arl t) ())
+
+  
+  val test1 = kmp "anas" ("bananas")
+  val test2 = kmp "" ("bananas")
+  val test3 = kmp "hide_fact" (File.read @{file "~~/src/HOL/Main.thy"})
+\<close>
+
 
 
 end
