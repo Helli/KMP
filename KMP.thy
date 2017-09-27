@@ -1263,18 +1263,32 @@ ML_val \<open>
   fun str2arl s = (Array.fromList (String.explode s), @{code nat_of_integer} (String.size s))
   fun kmp s t = map_option (@{code integer_of_nat}) (@{code kmp_string_impl} (str2arl s) (str2arl t) ())
 
-  
-  val test1 = kmp "anas" ("bananas")
-  val test2 = kmp "" ("bananas")
-  val test3 = kmp "hide_fact" (File.read @{file "~~/src/HOL/Main.thy"})
+  (*too fast, no warnings*)
+  val test1 = let val (s,t) = ("anas","bananas"); val kmp_res1 = timeap_msg "test1_kmp" (kmp s) t; in
+  @{assert} (kmp_res1 = kmp_res1(*replace by ... = timeap_msg "test1_nap" (nap s) t*)); kmp_res1 end;
+  val test2 = timeap_msg "test2_kmp" (kmp "") "bananas"
+  val test3 = timeap_msg "test3_kmp" (kmp "hide_fact") (File.read @{file "~~/src/HOL/Main.thy"})
   (*some(~370) almost(19char)-matches \<longrightarrow> bad for nap*)
-  val test4 = kmp "\\newcommand{\\isasymproof" (File.read @{file "~~/lib/texinputs/isabellesym.sty"})
+  val test4 = timeap_msg "test4_kmp" (kmp
+    "\\newcommand{\\isasymproof")
+    (File.read @{file "~~/lib/texinputs/isabellesym.sty"})
+  (*will it be bad enough for a warning? todo.*)
   (*pattern large \<longrightarrow> bad for kmp*)
-  val test5 = kmp (File.read @{file "~~/src/Pure/Thy/thy_output.ML"}) "anystring"
-
+  val test5 = timeap_msg "test5_kmp" (kmp
+    (File.read @{file "~~/src/Doc/JEdit/document/isabelle-jedit-hdpi.png"}))
+    (File.read @{file "~~/src/Doc/JEdit/document/isabelle-jedit-hdpi.png"})
+  (*a negative example*)
+  val test6 = timeap_msg "test6_kmp" (kmp
+    (File.read @{file "~~/src/Doc/JEdit/document/isabelle-jedit-hdpi.png"}))
+    "anystring"
+  
+  (*typical usecase, todo: difference to "hide_fact"-example?*)
+  val test7 = let val (s,t) =
+    ("basic_entity", File.read @{file "~~/src/Pure/Thy/thy_output.ML"});
+  val kmp_res7 = timeap_msg "test7_kmp" (kmp s) t in
+  @{assert} (kmp_res7 = kmp_res7); kmp_res7 end
+  
   (*todo: example where the alphabet is infinite or where equality takes long*)
+
 \<close>
-
-
-
 end
