@@ -1179,6 +1179,7 @@ lemma kmp_inner_in_bound:
   
 sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
   unfolding kmp3_def kmp2_def
+  apply (simp only: max_0L) \<comment>\<open>Avoid the unneeded @{const max}\<close>
   apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" conj_commute)
   apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" short_circuit_conv)
   supply kmp_inner_in_bound[dest]
