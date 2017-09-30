@@ -51,8 +51,9 @@ done
   (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
 thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
 
-section\<open>Sublist-predicate with a position check\<close>
-subsection\<open>Definition\<close>
+section\<open>Specification\<close>
+subsection\<open>Sublist-predicate with a position check\<close>
+subsubsection\<open>Definition\<close>
 definition "sublist_at' s t i \<equiv> take (length s) (drop i t) = s"  
 
 text\<open>Problem:\<close>
@@ -83,7 +84,7 @@ lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow>
   by (induction s t i rule: sublist_at.induct) auto
 
 text\<open>However, the new definition has some reasonable properties:\<close>
-subsection\<open>Properties\<close>
+subsubsection\<open>Properties\<close>
 lemma sublist_lengths: "sublist_at s t i \<Longrightarrow> i + length s \<le> length t"
   apply (induction s t i rule: sublist_at.induct)
   apply simp_all
@@ -123,7 +124,7 @@ lemma sublist_all_positions:
   by (induction s t i rule: sublist_at.induct)
     (auto simp: nth_Cons')
 
-subsection\<open>Other characterisations\<close>
+subsubsection\<open>Other characterisations\<close>
 fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
   where
   "slice (x#xs) (Suc n) l = slice xs n l"
@@ -164,14 +165,36 @@ proof (induction xs ys i rule: sublist_at.induct)
   qed
 qed auto
 
-corollary sublist_at_iff_sublist: "(\<exists>i. sublist_at s t i) \<longleftrightarrow> Sublist.sublist s t"
+corollary sublist_iff_sublist_at: "Sublist.sublist s t \<longleftrightarrow> (\<exists>i. sublist_at s t i)"
   by (simp add: sublist_at_altdef Sublist.sublist_def)
 
 lemma sublist_at_empty[simp]: "sublist_at [] ys 0"
-  by auto
+  by simp
 
+subsection\<open>Sublist-check algorithms\<close>
 
-section\<open>Naive algorithm\<close>
+definition "kmp_SPEC s t = SPEC (\<lambda>
+  None \<Rightarrow> \<nexists>i. sublist_at s t i |
+  Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+
+lemma is_arg_min_id: "is_arg_min id P i \<longleftrightarrow> P i \<and> (\<forall>i'<i. \<not>P i')"
+  unfolding is_arg_min_def by auto
+
+lemma kmp_result: "kmp_SPEC s t =
+  RETURN (if sublist s t then Some (LEAST i. sublist_at s t i) else None)"
+  unfolding kmp_SPEC_def sublist_iff_sublist_at
+  apply (auto simp: intro: LeastI dest: not_less_Least split: option.splits)
+  by (meson LeastI nat_neq_iff not_less_Least)
+
+corollary weak_kmp_SPEC: "kmp_SPEC s t \<le> SPEC (\<lambda>p. p\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
+  by (simp add: kmp_result)
+
+lemmas kmp_SPEC_altdefs =
+  kmp_SPEC_def[folded is_arg_min_id]
+  kmp_SPEC_def[folded sublist_iff_sublist_at]
+  kmp_result
+
+section\<open>Naive algorithm\<close>(*remove section? rename nap \<rightarrow> na / naive_algorithm?*)
 
 text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
@@ -247,8 +270,8 @@ definition "nap s t \<equiv> do {
 }"
 
 lemma "s \<noteq> []
-  \<Longrightarrow> nap s t \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
-  unfolding nap_def I_out_nap_def I_in_nap_def
+  \<Longrightarrow> nap s t \<le> kmp_SPEC s t"
+  unfolding nap_def kmp_SPEC_def I_out_nap_def I_in_nap_def
   apply (refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
@@ -541,10 +564,8 @@ proof (standard, standard)
 qed
 
 lemma kmp_correct: "s \<noteq> []
-  \<Longrightarrow> kmp s t \<le> SPEC (\<lambda>
-    None \<Rightarrow> \<nexists>i. sublist_at s t i |
-    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
-  unfolding kmp_def I_outer_def I_in_nap_def
+  \<Longrightarrow> kmp s t \<le> kmp_SPEC s t"
+  unfolding kmp_def kmp_SPEC_def I_outer_def I_in_nap_def
   apply (refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
@@ -892,7 +913,7 @@ lemma skipping_ok:
     qed
   qed
 
-lemma computeBorders_refine: "computeBorders s \<le> computeBordersSpec s"
+lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
   apply simp
   apply (refine_vcg
@@ -1049,7 +1070,7 @@ corollary computeBorders2_refine'[refine]:
   shows "computeBorders2 s \<le> \<Down> Id (computeBordersSpec s')"
 proof -
   note computeBorders2_ref1
-  also note computeBorders_refine
+  also note computeBorders_correct
   finally show ?thesis using assms by simp
 qed
   
@@ -1088,79 +1109,23 @@ lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   done
 
 lemma kmp2_correct: "s \<noteq> []
-  \<Longrightarrow> kmp2 s t \<le> SPEC (\<lambda>
-    None \<Rightarrow> \<nexists>i. sublist_at s t i |
-    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
-  (is "?s_ok \<Longrightarrow> _ \<le> ?SPEC")
+  \<Longrightarrow> kmp2 s t \<le> kmp_SPEC s t"
 proof -
-  assume ?s_ok
+  assume "s \<noteq> []"
   have "kmp2 s t \<le> kmp1 s t" by (fact kmp2_refine)
   also have "... \<le> kmp s t" by (fact kmp1_refine)
-  also have "... \<le> ?SPEC" by (fact kmp_correct[OF \<open>?s_ok\<close>])
+  also have "... \<le> kmp_SPEC s t" by (fact kmp_correct[OF \<open>s \<noteq> []\<close>])
   finally show ?thesis.
 qed
-
-corollary kmp2_sublist: "s \<noteq> [] \<Longrightarrow> kmp2 s t \<le> SPEC (\<lambda>p. p\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
-  apply (intro SPEC_cons_rule[OF kmp2_correct])
-  apply assumption
-  apply (metis (mono_tags, lifting) case_optionE option.simps(3) sublist_at_iff_sublist)
-  done
-
-lemma alternate_form: "(\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
-    | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i) =
-      (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
-    | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
-  unfolding is_arg_min_def by (auto split: option.split)
-
-lemma "s \<noteq> []
-  \<Longrightarrow> kmp s t \<le> SPEC (\<lambda>None \<Rightarrow> \<nexists>i. sublist_at s t i
-    | Some i \<Rightarrow> is_arg_min id (sublist_at s t) i)"
-  unfolding alternate_form by (fact kmp_correct)
-
 
 definition "kmp3 s t \<equiv> do {
   if s=[] then RETURN (Some 0) else kmp2 s t
 }"
 
-lemma kmp3_correct: "kmp3 s t \<le> SPEC (\<lambda>
-    None \<Rightarrow> \<nexists>i. sublist_at s t i |
-    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
-  unfolding kmp3_def
-  by (refine_vcg kmp2_correct) (auto)
-
+lemma kmp3_correct: "kmp3 s t \<le> kmp_SPEC s t"
+  unfolding kmp3_def by (simp add: kmp2_correct) (simp add: kmp_SPEC_def)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
-section\<open>Notes and Tests\<close>
-
-term "RETURN (4::nat) = SPEC (\<lambda>x. x=4)" 
-
-definition "test \<equiv> do {
-  x \<leftarrow> SPEC (\<lambda>x::nat. x<5);
-  y \<leftarrow> SPEC (\<lambda>y. y<10);
-  RETURN (x+y)
-}"  
-
-lemma "test \<le> SPEC (\<lambda>x. x<14)"
-  unfolding test_def
-  apply refine_vcg by auto  
-
-definition "i_test2 x\<^sub>0 \<equiv> \<lambda>(x,s). x\<ge>0 \<and> x\<^sub>0*5 = x*5+s"
-
-definition "test2 x\<^sub>0 \<equiv> do {
-  (_,s) \<leftarrow> WHILEIT (i_test2 x\<^sub>0) (\<lambda>(x,s). x>0) (\<lambda>(x,s). do {
-    let s = s + 5;
-    let x = x - 1;
-    RETURN (x,s)
-  }) (x\<^sub>0::int,0::int);
-  RETURN s
-}"
-
-lemma "x\<ge>0 \<Longrightarrow> test2 x \<le> SPEC (\<lambda>r. r=x*5)"
-  unfolding test2_def i_test2_def
-  apply (refine_vcg WHILEIT_rule[where R="measure (nat o fst)"])  
-  apply auto
-  done
-
 section\<open>Examples\<close>
 lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
   ''''
@@ -1224,18 +1189,11 @@ sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^
 
 export_code kmp_impl in SML_imp module_name KMP
 
-
-thm kmp3_correct
 lemma kmp3_correct':
-  "(uncurry kmp3,uncurry (\<lambda>s t. SPEC (\<lambda>
-    None \<Rightarrow> \<nexists>i. sublist_at s t i |
-    Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i')))) \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
+  "(uncurry kmp3, uncurry kmp_SPEC) \<in> Id \<times>\<^sub>r Id \<rightarrow>\<^sub>f \<langle>Id\<rangle>nres_rel"
   apply (intro frefI nres_relI; clarsimp)
-  apply (rule order_trans)
-  apply (rule kmp3_correct)
-  apply (auto split: option.split)
+  apply (fact kmp3_correct)
   done
-    
 
 lemmas kmp_impl_correct' = kmp_impl.refine[FCOMP kmp3_correct']
 
@@ -1247,10 +1205,9 @@ theorem kmp3_impl_correct:
               | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not> sublist_at s t i')
     )>\<^sub>t"
   by (sep_auto 
-    simp: pure_def 
+    simp: pure_def kmp_SPEC_def
     split: option.split
     heap:  kmp_impl_correct'[THEN hfrefD, THEN hn_refineD, of "(s,t)" "(si,ti)", simplified])
-
 
 definition "kmp_string_impl \<equiv> kmp_impl :: (char array \<times> nat) \<Rightarrow> _"
 
