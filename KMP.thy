@@ -43,14 +43,6 @@ lemma array_fold_custom_upt:
   by (auto simp: op_array_upt_def intro!: ext)
 lemmas array_upt_custom_hnr[sepref_fr_rules] = array_upt_hnr[unfolded array_fold_custom_upt]
 
-text\<open>Is this generalisation of @{thm nth_drop} useful?\<close>
-lemma nth_drop': "n \<le> length xs \<Longrightarrow> drop n xs ! i = xs ! (n + i)"
-apply (induct n arbitrary: xs, auto)
- apply (case_tac xs, auto)
-done
-  (*by (metis append_take_drop_id length_take min.absorb2 nth_append_length_plus)*)
-thm nth_drop[of _ i] add_leD1[of _ i, THEN nth_drop'[of _ _ i]]
-
 section\<open>Specification\<close>
 subsection\<open>Sublist-predicate with a position check\<close>
 subsubsection\<open>Definition\<close>
@@ -101,14 +93,14 @@ lemma sublist_step:
   using sublist_at.elims(3) by fastforce
 
 lemma all_positions_sublist:
-"\<lbrakk>i + length s \<le> length t; \<forall>j'<length s. t!(i+j') = s!j'\<rbrakk> \<Longrightarrow> sublist_at s t i"
+"\<lbrakk>i + length s \<le> length t; \<forall>jj<length s. t!(i+jj) = s!jj\<rbrakk> \<Longrightarrow> sublist_at s t i"
 proof (induction s rule: rev_induct)
   case Nil
   then show ?case by (simp add: Nil_is_sublist)
 next
   case (snoc x xs)
   from \<open>i + length (xs @ [x]) \<le> length t\<close> have "i + length xs \<le> length t" by simp
-  moreover have "\<forall>j'<length xs. t ! (i + j') = xs ! j'"
+  moreover have "\<forall>jj<length xs. t ! (i + jj) = xs ! jj"
     by (simp add: nth_append snoc.prems(2))
   ultimately have f: "sublist_at xs t i"
     using snoc.IH by simp
@@ -120,7 +112,7 @@ next
 qed
 
 lemma sublist_all_positions:
-  "sublist_at s t i \<Longrightarrow> \<forall>j'<length s. t!(i+j') = s!j'"
+  "sublist_at s t i \<Longrightarrow> \<forall>jj<length s. t!(i+jj) = s!jj"
   by (induction s t i rule: sublist_at.induct)
     (auto simp: nth_Cons')
 
@@ -175,9 +167,9 @@ subsection\<open>Sublist-check algorithms\<close>
 
 definition "kmp_SPEC s t = SPEC (\<lambda>
   None \<Rightarrow> \<nexists>i. sublist_at s t i |
-  Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not>sublist_at s t i'))"
+  Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>ii<i. \<not>sublist_at s t ii))"
 
-lemma is_arg_min_id: "is_arg_min id P i \<longleftrightarrow> P i \<and> (\<forall>i'<i. \<not>P i')"
+lemma is_arg_min_id: "is_arg_min id P i \<longleftrightarrow> P i \<and> (\<forall>ii<i. \<not>P ii)"
   unfolding is_arg_min_def by auto
 
 lemma kmp_result: "kmp_SPEC s t =
@@ -199,10 +191,10 @@ section\<open>Naive algorithm\<close>(*remove section? rename nap \<rightarrow> 
 text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
 subsection\<open>Basic form\<close>
 definition "I_out_na s t \<equiv> \<lambda>(i,j,found).
-  \<not>found \<and> j = 0 \<and> (\<forall>i'<i. \<not>sublist_at s t i')
+  \<not>found \<and> j = 0 \<and> (\<forall>ii<i. \<not>sublist_at s t ii)
   \<or> found \<and> sublist_at s t i"
 definition "I_in_na s t iout \<equiv> \<lambda>(j,found).
-  (\<forall>j'<j. t!(iout+j') = s!(j')) \<and> (if found then j = length s else j < length s)"
+  (\<forall>jj<j. t!(iout+jj) = s!(jj)) \<and> (if found then j = length s else j < length s)"
 
 definition "na s t \<equiv> do {
   let i=0;
@@ -860,11 +852,12 @@ lemma skipping_ok:
         \<comment>\<open>This could not be extended to a border of @{term \<open>take j s\<close>} due to the mismatch.\<close>
       let ?impossible = "take (iblp1 s j - 2) s"
         \<comment>\<open>A strict border longer than @{term \<open>intrinsic_border ?border\<close>}, a contradiction.\<close>
-      have "i - 1 \<le> length s"
-        by (metis One_nat_def assms(5) border_length_le bounds diff_diff_cancel diff_is_0_eq' diff_le_self leD len_greater_imp_nonempty length_take less_Suc_eq_le less_imp_le_nat less_le_trans list.size(3) min_simps(2) nat_le_linear nat_neq_iff take_all)
-      from border_take_lengths[OF this assms(5)] have le[simp]: "i - 1 \<le> j - 1".
-      have "iblp1 s (i-1) \<le> i - 1"
-        using \<open>i - 1 \<le> length s\<close> by (simp add: j_le_iblp1_le)
+      from assms(5) bounds border_take_lengths have le[simp]: "i - 1 \<le> j - 1"
+        by (metis One_nat_def leD nat_le_linear neq0_conv nz_le_conv_less take_all)
+      with bounds(2) have "i - 1 \<le> length s"
+        by linarith
+      then have "iblp1 s (i-1) \<le> i - 1"
+        by (simp add: j_le_iblp1_le)
       then have [simp]: "iblp1 s (i-1) - 1 < j"
         using le bounds(1) by linarith
       have [simp]: "length (take j s) = j"
@@ -1203,7 +1196,7 @@ theorem kmp3_impl_correct:
        kmp_impl si ti 
    <\<lambda>r. arl_assn id_assn s si * arl_assn id_assn t ti * \<up>(
       case r of None \<Rightarrow>  \<nexists>i. sublist_at s t i
-              | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>i'<i. \<not> sublist_at s t i')
+              | Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>ii<i. \<not> sublist_at s t ii)
     )>\<^sub>t"
   by (sep_auto 
     simp: pure_def kmp_SPEC_def
