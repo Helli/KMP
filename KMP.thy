@@ -12,37 +12,6 @@ lemma nat_min_absorb_Suc[simp]: (*rm?*)
   "b < Suc a \<Longrightarrow> min a b = b"
   by simp_all
 
-section\<open>Additions to @{theory "IICF_List"} and @{theory "IICF_Array"}\<close>
-(*No longer needed, using replicate instead*)
-sepref_decl_op list_upt: upt :: "nat_rel \<rightarrow> nat_rel \<rightarrow> \<langle>nat_rel\<rangle>list_rel".
-
-definition array_upt :: "nat \<Rightarrow> nat \<Rightarrow> nat array Heap" where
-  "array_upt m n = Array.make (n-m) (\<lambda>i. i + m)"
-
-lemma map_plus_upt: "map (\<lambda>i. i + a) [0..<b - a] = [a..<b]"
-  by (induction b) (auto simp: map_add_upt)
-
-lemma array_upt_hnr_aux: "(uncurry array_upt, uncurry (RETURN oo op_list_upt)) \<in> nat_assn\<^sup>k *\<^sub>a nat_assn\<^sup>k \<rightarrow>\<^sub>a is_array"
-  by sepref_to_hoare (sep_auto simp: array_upt_def array_assn_def is_array_def map_plus_upt)
-
-lemma fold_array_assn_alt: "hr_comp is_array (\<langle>R\<rangle>list_rel) = array_assn (pure R)"
-  unfolding array_assn_def by auto
-
-context
-  notes [fcomp_norm_unfold] = fold_array_assn_alt
-begin
-  sepref_decl_impl (no_register) array_upt: array_upt_hnr_aux.
-end
-
-definition [simp]: "op_array_upt \<equiv> op_list_upt"
-sepref_register op_array_upt
-lemma array_fold_custom_upt:
-  "upt = op_array_upt"
-  "op_list_upt = op_array_upt"
-  "mop_list_upt = RETURN oo op_array_upt"
-  by (auto simp: op_array_upt_def intro!: ext)
-lemmas array_upt_custom_hnr[sepref_fr_rules] = array_upt_hnr[unfolded array_fold_custom_upt]
-
 section\<open>Specification\<close>
 subsection\<open>Sublist-predicate with a position check\<close>
 subsubsection\<open>Definition\<close>
@@ -340,25 +309,6 @@ lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarr
 
 lemma positions_strict_border: "l < length w \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> strict_border (take l w) w"
   by (simp add: positions_border strict_border_def)
-
-subsection\<open>@{const arg_min} and @{const arg_max}\<close>
-lemma arg_max_natI2:
-  fixes m::"_\<Rightarrow>nat"
-  assumes "P x"
-    and "\<forall>y. P y \<longrightarrow> m y < b"
-    and "\<And>x. P x \<Longrightarrow> Q x"
-  shows "Q (arg_max m P)"
-by (fact arg_max_natI[OF assms(1,2), THEN assms(3)])
-
-lemma arg_min_arg_max:
-  fixes m::"_\<Rightarrow>nat"
-  assumes "\<forall>y. P y \<longrightarrow> m y < b"
-  shows "arg_min m P = arg_max (\<lambda>a. b - m a) P"
-proof -
-  have a: "(\<forall>y. P y \<longrightarrow> b - m y \<le> b - m x) \<longleftrightarrow> (\<forall>y. P y \<longrightarrow> m x \<le> m y)" for x
-    using assms diff_le_mono2 by force
-  show ?thesis unfolding arg_min_def arg_max_def is_arg_min_linorder is_arg_max_linorder a..
-qed
 
 definition "intrinsic_border w \<equiv> ARG_MAX length r. strict_border r w"
 
@@ -1120,10 +1070,6 @@ lemma kmp3_correct: "kmp3 s t \<le> kmp_SPEC s t"
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 section\<open>Examples\<close>
-lemma ex0: "border a '''' \<longleftrightarrow> a\<in>{
-  ''''
-  }"
-  by (simp add: border_bot.bot.extremum_unique)
 
 lemma ex1: "border a ''a'' \<longleftrightarrow> a\<in>{
   '''',
