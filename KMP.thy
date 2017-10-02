@@ -443,12 +443,6 @@ lemma "p576 et seq":
     i_increase: "i' > i"
   using assignments by (simp_all add: j_le_iblp1_le[OF assms(1), THEN le_imp_less_Suc])
 
-lemma sublist_sublist:
-  "\<lbrakk>sublist_at s1 t i; sublist_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> sublist_at (s1@s2) t i"
-  apply (induction s1 t i rule: sublist_at.induct)
-  apply auto
-  done
-
 lemma reuse_matches: 
   assumes j_le: "j \<le> length s"
   and old_matches: "\<forall>jj<j. t ! (i + jj) = s ! jj"
@@ -680,10 +674,10 @@ proof -
     by simp
 qed
 
-corollary length_ib_take: "2 \<le> j \<Longrightarrow> j \<le> length w \<Longrightarrow> length (intrinsic_border (take j w)) \<le> length (intrinsic_border (take (j-1) w)) + 1"
+corollary length_ib_take:(*rm*) "2 \<le> j \<Longrightarrow> j \<le> length w \<Longrightarrow> length (intrinsic_border (take j w)) \<le> length (intrinsic_border (take (j-1) w)) + 1"
   by (metis butlast_take ib_butlast length_take min.absorb2)
 
-corollary iblp1_Suc: "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc i) \<le> iblp1 w i + 1"
+corollary iblp1_Suc(*rm*): "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc i) \<le> iblp1 w i + 1"
   apply (cases i)
    apply (simp_all add: take_Suc0)
   by (metis One_nat_def Suc_eq_plus1 Suc_to_right butlast_take diff_is_0_eq ib_butlast length_take min.absorb2 nat.simps(3) not_less_eq_eq numerals(2))
@@ -691,7 +685,7 @@ corollary iblp1_Suc: "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc i) \<l
 lemma sus: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border (w@[w!length (intrinsic_border w)])) \<le> length (intrinsic_border w) + 1"
   by (metis Suc_le_mono butlast_snoc ib_butlast length_append_singleton length_ge_1_conv numerals(2))
 
-lemma iblp1_step_bound:
+lemma iblp1_step_bound(*rm*):
   assumes "j \<le> length w"
   shows "iblp1 w j \<le> iblp1 w (j-1) + 1"
   using assms[THEN j_le_iblp1_le] iblp1_Suc assms
