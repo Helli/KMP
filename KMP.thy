@@ -554,9 +554,9 @@ lemma kmp_correct: "s \<noteq> []
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
     )
   apply (vc_solve solve: asm_rl)
-  subgoal for i jout j by (metis add_Suc_right all_positions_sublist less_antisym)
+  subgoal by (metis add_Suc_right all_positions_sublist less_antisym)
   subgoal using less_antisym by blast
-  subgoal for i jout j ii using shift_safe[of i s t j] by fastforce
+  subgoal for i jout j using shift_safe[of i s t j] by fastforce
   subgoal for i jout j using reuse_matches[of j s t i] intrinsic_border_less'' by simp
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
@@ -916,35 +916,10 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     apply linarith+
     apply (metis discrete ibpl_step_bound not_le)
     by blast
-  subgoal for b j i unfolding strict_border_def
+  subgoal unfolding strict_border_def
     by (metis le_less length_take less_not_refl min_less_iff_conj not_less_eq take_all)
-  subgoal for b j i
-    using border_bot.bot.not_eq_extremum strict_border_imp_nonempty by blast
-  subgoal for b j i
-  proof -
-    assume a1: "iblp1 s j \<le> Suc (iblp1 s (i - 1))"
-    assume a2: "\<forall>jj<j. b ! jj = iblp1 s jj"
-    assume a3: "strict_border (take (i - 1) s) (take (j - 1) s)"
-    assume a4: "i - 1 < length b"
-    assume a5: "Suc (length s) = length b"
-    assume a6: "j < length b"
-    assume a7: "b ! (i - 1) = 0"
-    assume a8: "1 < j"
-    have f9: "length (take (i - 1) s) < length (take (j - 1) s)"
-      using a3 by (meson border_length_r_less)
-    have "i - 1 \<le> length s"
-      using a5 a4 by (metis less_Suc_eq_le)
-    then have "i - 1 < j"
-      using f9 a6 by (metis (no_types) diff_le_self length_take less_le_trans min.absorb2 min_def_raw)
-    then have f10: "Suc (iblp1 s (i - 1)) \<le> 1"
-      using a7 a2 by (metis (no_types) diff_Suc_1 diff_is_0_eq)
-    have "j \<noteq> 0"
-      using a8 by (meson gr_implies_not0)
-    then have "1 \<le> iblp1 s j"
-      by (metis (no_types) diff_Suc_1 diff_is_0_eq iblp1_j0 not_less_eq_eq)
-    then show ?thesis
-      using f10 a1 by (metis (no_types) le_antisym le_trans)
-  qed
+  subgoal using border_bot.bot.not_eq_extremum strict_border_imp_nonempty by blast
+  subgoal by (auto elim: strict_borderE' intro: border_take_lengths simp: le_eq_less_or_eq)
   subgoal apply (rule iblp1_strict_borderI; auto)
     by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
   subgoal for b j i
@@ -974,22 +949,17 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     with \<open>iblp1 s j \<le> Suc (iblp1 s (i-1))\<close> show ?case
       using "1"(10) "iblp1 s (i-1) already computed" le_antisym by presburger
   qed
-  subgoal for b j i apply (rule iblp1_strict_borderI; auto)
+  subgoal
+    apply (rule iblp1_strict_borderI; auto)
     by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
-  subgoal for b j i apply (unfold Suc_eq_plus1)
-  proof goal_cases
-    case 1
-    then have [simp]: "i - 1 < j"
-      by (metis (no_types, lifting) One_nat_def border_length_r_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
-    then have goal: "?case \<longleftrightarrow> iblp1 s j \<le> iblp1 s (iblp1 s (i-1) - 1) + 1"
-      by (simp add: "1"(9))
-    from 1(8,9) have "s ! (iblp1 s (i-1) - 1) \<noteq> s ! (j - 1)" using \<open>i - 1 < j\<close> by auto
-    with 1 show ?case unfolding goal by (intro skipping_ok) simp_all
-  qed
-  subgoal for b j i apply simp
-    by (metis (no_types, lifting) Suc_pred border_take_lengths diff_le_self j_le_iblp1_le less_Suc_eq_le less_le_trans strict_border_def zero_less_diff)
-  apply (metis Suc_eq_plus1 Suc_leI diff_0_eq_0 diff_Suc_1 diff_is_0_eq generalisation iblp1_j0 leD less_Suc0 nat_neq_iff nth_list_update_eq nth_list_update_neq)
-  by linarith
+  subgoal
+    by (metis One_nat_def Suc_eq_plus1 Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le skipping_ok strict_borderE')
+  subgoal
+    by (metis One_nat_def Suc_lessD Suc_pred border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_borderE')
+  subgoal
+    by (metis Suc_eq_plus1 add.left_neutral iblp1_j0 j_le_iblp1_le le_antisym nat_geq_1_eq_neqz nat_neq_iff not_less_eq nth_list_update_eq nth_list_update_neq)
+  subgoal by linarith
+  done
 
 text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
