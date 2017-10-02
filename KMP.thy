@@ -257,13 +257,7 @@ interpretation border_order: order border strict_border
 interpretation border_bot: order_bot Nil border strict_border
   by standard (simp add: border_def)
 
-lemma strict_borderE [elim?]: (*remove?*)
-  fixes xs ys :: "'a list"
-  assumes "strict_border xs ys"
-  obtains "border xs ys" and "xs \<noteq> ys"
-  using assms unfolding strict_border_def by blast
-
-lemma strict_borderE' [elim?]: (*remove tick?*)
+lemma strict_borderE[elim]:
   fixes xs ys :: "'a list"
   assumes "strict_border xs ys"
   obtains "border xs ys" and "length xs < length ys"
@@ -284,7 +278,7 @@ lemma border_length_le: "border xs ys \<Longrightarrow> length xs \<le> length y
   unfolding border_def by (simp add: prefix_length_le)
 
 lemma border_length_r_less: "\<forall>xs. strict_border xs ys \<longrightarrow> length xs < length ys"
-  using strict_borderE' by auto
+  using strict_borderE by auto
 
 lemma border_positions: "border xs ys \<Longrightarrow> \<forall>i<length xs. ys!i = ys!(length ys - length xs + i)"
   unfolding border_def
@@ -316,7 +310,7 @@ lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_borde
   thm arg_max_natI[of _ "[]"]
   apply (rule arg_max_natI[of _ "[]"])
    apply (simp add: border_bot.bot.not_eq_extremum)
-  using strict_borderE' by auto
+  using strict_borderE by auto
 
 lemmas intrinsic_borderI = arg_max_natI[OF _ border_length_r_less, folded intrinsic_border_def]
 
@@ -771,7 +765,7 @@ corollary strict_border_take_iblp1: "0 < i \<Longrightarrow> i \<le> length s \<
   by (meson border_order.less_le_not_le border_take_iblp1 border_take_lengths j_le_iblp1_le' leD)
 
 lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
-  by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE' iblp1.elims intrinsic_border_max length_take min.absorb2)
+  by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE iblp1.elims intrinsic_border_max length_take min.absorb2)
 
 text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
@@ -919,9 +913,8 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   subgoal unfolding strict_border_def
     by (metis le_less length_take less_not_refl min_less_iff_conj not_less_eq take_all)
   subgoal using border_bot.bot.not_eq_extremum strict_border_imp_nonempty by blast
-  subgoal by (auto elim: strict_borderE' intro: border_take_lengths simp: le_eq_less_or_eq)
-  subgoal apply (rule iblp1_strict_borderI; auto)
-    by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
+  subgoal by (auto intro: border_take_lengths simp: le_eq_less_or_eq)
+  subgoal by (rule iblp1_strict_borderI; auto)
   subgoal for b j i
   proof goal_cases
     case 1
@@ -949,13 +942,11 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     with \<open>iblp1 s j \<le> Suc (iblp1 s (i-1))\<close> show ?case
       using "1"(10) "iblp1 s (i-1) already computed" le_antisym by presburger
   qed
+  subgoal by (rule iblp1_strict_borderI; auto)
   subgoal
-    apply (rule iblp1_strict_borderI; auto)
-    by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
+    by (metis One_nat_def Suc_eq_plus1 Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le skipping_ok strict_borderE)
   subgoal
-    by (metis One_nat_def Suc_eq_plus1 Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le skipping_ok strict_borderE')
-  subgoal
-    by (metis One_nat_def Suc_lessD Suc_pred border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_borderE')
+    by (metis One_nat_def Suc_lessD Suc_pred border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_borderE)
   subgoal
     by (metis Suc_eq_plus1 add.left_neutral iblp1_j0 j_le_iblp1_le le_antisym nat_geq_1_eq_neqz nat_neq_iff not_less_eq nth_list_update_eq nth_list_update_neq)
   subgoal by linarith
@@ -991,13 +982,8 @@ lemma computeBorders_inner_bounds:
   assumes "I_in_cb s j i"
   shows "i-1 < length s" "j-1 < length s"
   using assms
-  apply (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
-  subgoal
-    by (metis One_nat_def border_order.less_irrefl diff_Suc_Suc diff_zero intrinsic_border_less'' less_imp_diff_less take.simps(1))
-  subgoal 
-    by (metis border_length_r_less length_take less_imp_le_nat min_simps(2) not_less take_all)
-  done
-  
+    by (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
+
 lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> computeBorders2 s \<le> \<Down>Id (computeBorders s')"
   unfolding computeBorders2_def computeBorders_def
   apply (refine_rcg)
