@@ -621,11 +621,6 @@ proof -
     by (metis append_eq_conv_conj prefix_def)
 qed
 
-lemma I_out_2_I_in: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s (j-1) = i \<Longrightarrow> strict_border (take (i-1) s) (take (j-1) s)" (*inline i?*)
-  apply (cases "j-1")
-  apply auto
-  by (metis intrinsic_borderI' le_0_eq list.size(3) nat.simps(3) take_eq_Nil zero_not_eq_two)
-
 lemma ib1[simp]: "intrinsic_border [z] = []"
   by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
 
@@ -769,6 +764,12 @@ lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
   by (metis border_order.order.strict_implies_order intrinsic_borderI' intrinsic_border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil todoname zero_less_Suc)
 
+corollary iblp1_strict_borderI: "y = iblp1 s (i - 1) \<Longrightarrow> strict_border (take (i - 1) s) (take (j - 1) s) \<Longrightarrow> strict_border (take (y - 1) s) (take (j - 1) s)"
+  using border_order.less_le_not_le border_order.order.trans border_take_iblp1 by blast
+
+corollary strict_border_take_iblp1: "0 < i \<Longrightarrow> i \<le> length s \<Longrightarrow> strict_border (take (iblp1 s i - 1) s ) (take i s)"
+  by (meson border_order.less_le_not_le border_take_iblp1 border_take_lengths j_le_iblp1_le' leD)
+
 lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
   by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE' iblp1.elims intrinsic_border_max length_take min.absorb2)
 
@@ -905,10 +906,10 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
   apply (vc_solve, fold One_nat_def)
-  apply (safe intro!: I_out_2_I_in; auto)
+  subgoal by (rule strict_border_take_iblp1, auto)
   apply (metis Suc_eq_plus1 generalisation less_Suc_eq_le less_imp_le_nat)
   apply (metis One_nat_def diff_is_0_eq iblp1_j0 less_not_refl2 linorder_not_less)
-  apply (metis I_out_2_I_in One_nat_def Suc_to_right iblp1_j0 leI less_Suc0 less_Suc_eq_le less_antisym less_not_refl3 numeral_2_eq_2)
+  subgoal by (rule strict_border_take_iblp1; use leI in fastforce)
   subgoal for b j apply (unfold Suc_eq_plus1)
     apply (rule skipping_ok)
     using leI apply fastforce
@@ -944,14 +945,8 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     then show ?thesis
       using f10 a1 by (metis (no_types) le_antisym le_trans)
   qed
-  subgoal for b j i
-  proof goal_cases
-    case 1
-    then have "i - 1 < j"
-      by (metis (no_types, lifting) One_nat_def border_length_r_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
-    then show ?case
-      by (smt "1"(1) "1"(10) "1"(5) "1"(6) "1"(8) I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans diff_is_0_eq' iblp1.simps(1) le_numeral_extra(1) less_Suc_eq_le less_trans_Suc numeral_2_eq_2)
-  qed
+  subgoal apply (rule iblp1_strict_borderI; auto)
+    by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
   subgoal for b j i
   proof goal_cases
     case 1
@@ -979,14 +974,8 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     with \<open>iblp1 s j \<le> Suc (iblp1 s (i-1))\<close> show ?case
       using "1"(10) "iblp1 s (i-1) already computed" le_antisym by presburger
   qed
-  subgoal for b j i
-  proof goal_cases
-    case 1
-    then have "i - 1 < j"
-      by (metis (no_types, lifting) One_nat_def border_length_r_less leI length_take less_Suc_eq_le min_less_iff_conj not_less_iff_gr_or_eq nz_le_conv_less)
-    with 1 show ?case
-      by (smt I_out_2_I_in One_nat_def Suc_leI Suc_lessI Suc_pred border_order.dual_order.strict_trans iblp1_j0 leD less_Suc_eq neq0_conv numeral_2_eq_2)
-  qed
+  subgoal for b j i apply (rule iblp1_strict_borderI; auto)
+    by (metis Suc_lessD Suc_pred border_take_lengths less_Suc_eq_le strict_borderE')
   subgoal for b j i apply (unfold Suc_eq_plus1)
   proof goal_cases
     case 1
