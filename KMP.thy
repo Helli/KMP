@@ -246,9 +246,9 @@ lemma "s \<noteq> []
 
 section\<open>Borders of lists\<close>
 
-definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
+definition "border xs ys \<longleftrightarrow> prefix xs ys \<and> suffix xs ys"
 definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> length xs < length ys"
-definition "intrinsic_border l \<equiv> ARG_MAX length b. strict_border b l"
+definition "intrinsic_border ls \<equiv> ARG_MAX length b. strict_border b ls"
 
 subsection\<open>Properties\<close>
 
@@ -274,22 +274,21 @@ lemma strict_border_simps[simp]:
   "strict_border [] (x # xs) \<longleftrightarrow> True"
   by (simp_all add: strict_border_def)
 
-lemma strict_border_prefix: "strict_border r w \<Longrightarrow> strict_prefix r w"
-  and strict_border_suffix: "strict_border r w \<Longrightarrow> strict_suffix r w"
-  and strict_border_imp_nonempty: "strict_border r w \<Longrightarrow> w \<noteq> []"
-  and strict_border_prefix_suffix: "strict_border r w \<longleftrightarrow> strict_prefix r w \<and> strict_suffix r w"
+lemma strict_border_prefix: "strict_border xs ys \<Longrightarrow> strict_prefix xs ys"
+  and strict_border_suffix: "strict_border xs ys \<Longrightarrow> strict_suffix xs ys"
+  and strict_border_imp_nonempty: "strict_border xs ys \<Longrightarrow> ys \<noteq> []"
+  and strict_border_prefix_suffix: "strict_border xs ys \<longleftrightarrow> strict_prefix xs ys \<and> strict_suffix xs ys"
   by (auto simp: border_order.order.strict_iff_order border_def)
 
-lemma border_length_le: "border r w \<Longrightarrow> length r \<le> length w"
+lemma border_length_le: "border xs ys \<Longrightarrow> length xs \<le> length ys"
   unfolding border_def by (simp add: prefix_length_le)
 
-lemma border_length_r_less: "\<forall>r. strict_border r w \<longrightarrow> length r < length w"
+lemma border_length_r_less: "\<forall>xs. strict_border xs ys \<longrightarrow> length xs < length ys"
   using strict_borderE' by auto
 
-lemma border_positions: "border r w \<Longrightarrow> \<forall>i<length r. w!i = w!(length w - length r + i)" unfolding border_def
+lemma border_positions: "border xs ys \<Longrightarrow> \<forall>i<length xs. ys!i = ys!(length ys - length xs + i)"
+  unfolding border_def
   by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
-
-lemmas nth_stuff = nth_take nth_take_lemma nth_equalityI
 
 (*Todo: swap names, add i+\<dots>, decide whether w instead of x and w is enough*)
 lemma all_positions_drop_length_take: "\<lbrakk>i \<le> length w; i \<le> length x;
@@ -325,7 +324,7 @@ lemmas intrinsic_borderI' = border_bot.bot.not_eq_extremum[THEN iffD1, THEN intr
 
 lemmas intrinsic_border_max = arg_max_nat_le[OF _ border_length_r_less, folded intrinsic_border_def]
 
-lemma nonempty_is_arg_max_ib: "w \<noteq> [] \<Longrightarrow> is_arg_max length (\<lambda>r. strict_border r w) (intrinsic_border w)"
+lemma nonempty_is_arg_max_ib: "ys \<noteq> [] \<Longrightarrow> is_arg_max length (\<lambda>xs. strict_border xs ys) (intrinsic_border ys)"
   by (simp add: intrinsic_borderI' intrinsic_border_max is_arg_max_linorder)
 
 lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border w) < length w"
@@ -630,16 +629,16 @@ lemma I_out_2_I_in: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarr
 lemma ib1[simp]: "intrinsic_border [z] = []"
   by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
 
-lemma border_butlast: "border r w \<Longrightarrow> border (butlast r) (butlast w)"
+lemma border_butlast: "border xs ys \<Longrightarrow> border (butlast xs) (butlast ys)"
   apply (auto simp: border_def)
    apply (metis butlast_append prefixE prefix_order.eq_refl prefix_prefix prefixeq_butlast)
   apply (metis Sublist.suffix_def append.right_neutral butlast.simps(1) butlast_append)
   done
 
-corollary strict_border_butlast: "r \<noteq> [] \<Longrightarrow> strict_border r w \<Longrightarrow> strict_border (butlast r) (butlast w)"
+corollary strict_border_butlast: "xs \<noteq> [] \<Longrightarrow> strict_border xs ys \<Longrightarrow> strict_border (butlast xs) (butlast ys)"
   unfolding strict_border_def by (simp add: border_butlast less_diff_conv)
 
-lemma border_take: "j \<le> length r \<Longrightarrow> border r w \<Longrightarrow> border (take j r) (take j w)"
+lemma border_take: "j \<le> length xs \<Longrightarrow> border xs ys \<Longrightarrow> border (take j xs) (take j ys)"
   apply (auto simp: border_def)
    apply (metis prefixE prefix_def take_append)
   by (metis append_Nil2 diff_is_0_eq' prefixE suffix_order.eq_iff take_0 take_append)
@@ -647,13 +646,13 @@ lemma border_take: "j \<le> length r \<Longrightarrow> border r w \<Longrightarr
 lemma border_take_lengths: "i \<le> length s \<Longrightarrow> border (take i s) (take j s) \<Longrightarrow> i \<le> j"
   using border_length_le by fastforce
 
-lemma border_step: "border r w \<longleftrightarrow> border (r@[w!length r]) (w@[w!length r])"
+lemma border_step: "border xs ys \<longleftrightarrow> border (xs@[ys!length xs]) (ys@[ys!length xs])"
   apply (auto simp: border_def suffix_def)
   using append_one_prefix prefixE apply fastforce
   using append_prefixD apply blast
   done
 
-corollary strict_border_step: "strict_border r w \<longleftrightarrow> strict_border (r@[w!length r]) (w@[w!length r])"
+corollary strict_border_step: "strict_border xs ys \<longleftrightarrow> strict_border (xs@[ys!length xs]) (ys@[ys!length xs])"
   unfolding strict_border_def using border_step by auto(*or use proof above*)
 
 corollary strict_border_step': "i-1 < j-1 \<Longrightarrow> i-1 < length s \<Longrightarrow> strict_border (take (i - 1) s) (take (j-1) s) \<longleftrightarrow> strict_border (take (i-1) s @ [s!(i-1)]) (take (j-1) s @ [s!(i-1)])"
@@ -1212,5 +1211,8 @@ ML_val \<open>
   (*todo: example where the alphabet is infinite or where equality takes long*)
 
 \<close>
+
+unused_thms
+find_unused_assms
 
 end
