@@ -1129,15 +1129,12 @@ declare computeBorders2_impl.refine[sepref_fr_rules]
 
 sepref_register computeBorders
 
-thm Sepref_Translate.WHILEIT_comb
-
 lemma kmp_inner_in_bound:
-  assumes "I_outer s t (i, jxx, None)"
   assumes "i + length s \<le> length t"
   assumes "I_in_nap s t i (j,None)"
   shows "i + j < length t" "j < length s"
   using assms
-  by (auto simp: I_outer_def I_in_nap_def)
+  by (auto simp: I_in_nap_def)
   
 sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
   unfolding kmp3_def kmp2_def
@@ -1213,6 +1210,5 @@ ML_val \<open>
 \<close>
 
 unused_thms
-find_unused_assms
 
 end
