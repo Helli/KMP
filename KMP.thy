@@ -185,7 +185,7 @@ definition "na s t \<equiv> do {
   RETURN found
 }"
 
-lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
+lemma na_correct: "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
   \<Longrightarrow> na s t \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. sublist_at s t i))"
   unfolding na_def I_out_na_def I_in_na_def
   apply (refine_vcg 
@@ -200,7 +200,7 @@ lemma "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
   subgoal by (meson le_diff_conv2 leI order_trans sublist_lengths)
   done
 
-text\<open>The first precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{prop \<open>length s \<le> length t\<close>} is not needed if we use @{type int} or rewrite @{prop \<open>i \<le> length t - length s\<close>} in the first while-condition to @{prop \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
+text\<open>The first precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{thm (prem 2) na_correct [no_vars]} is not needed if we use @{type int} or rewrite @{prop \<open>i \<le> length t - length s\<close>} in the first while-condition to @{prop \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
 
 subsection\<open>A variant returning the position\<close>
 definition "I_out_nap s t \<equiv> \<lambda>(i,j,pos).
@@ -244,12 +244,13 @@ lemma "s \<noteq> []
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
 
-section\<open>Knuth–Morris–Pratt algorithm\<close>
+section\<open>Borders of lists\<close>
 
-subsection\<open>Auxiliary definitions\<close>
-text\<open>Borders of words\<close>
 definition "border r w \<longleftrightarrow> prefix r w \<and> suffix r w"
 definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> length xs < length ys"
+definition "intrinsic_border l \<equiv> ARG_MAX length b. strict_border b l"
+
+subsection\<open>Properties\<close>
 
 interpretation border_order: order border strict_border
   by standard (auto simp: border_def suffix_def strict_border_def)
@@ -310,8 +311,6 @@ lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarr
 lemma positions_strict_border: "l < length w \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> strict_border (take l w) w"
   by (simp add: positions_border strict_border_def)
 
-definition "intrinsic_border w \<equiv> ARG_MAX length r. strict_border r w"
-
 lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_border w) w"
   (*equivalent to intrinsic_borderI'*)
   unfolding intrinsic_border_def
@@ -335,11 +334,87 @@ lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_
 lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
   by (metis intrinsic_border_less length_take less_not_refl2 min_less_iff_conj take_eq_Nil)
 
+subsection\<open>Examples\<close>
+
+lemma border_example: "{b. border b ''aabaabaa''} = {'''', ''a'', ''aa'', ''aabaa'', ''aabaabaa''}"
+  (is "{b. border b ?l} = {?take0, ?take1, ?take2, ?take5, ?l}")
+proof
+  show "{?take0, ?take1, ?take2, ?take5, ?l} \<subseteq> {b. border b ?l}"
+    by simp eval
+  have "\<not>border ''aab'' ?l" "\<not>border ''aaba'' ?l" "\<not>border ''aabaab'' ?l" "\<not>border ''aabaaba'' ?l"
+    by eval+
+  moreover have "{b. border b ?l} \<subseteq> set (prefixes ?l)"
+    using border_def in_set_prefixes by blast
+  ultimately show "{b. border b ?l} \<subseteq> {?take0, ?take1, ?take2, ?take5, ?l}"
+    by auto
+qed
+
+corollary strict_border_example: "{b. strict_border b ''aabaabaa''} = {'''', ''a'', ''aa'', ''aabaa''}"
+  (is "?l = ?r")
+proof
+  have "?l \<subseteq> {b. border b ''aabaabaa''}"
+    by auto
+  also have "\<dots> = {'''', ''a'', ''aa'', ''aabaa'', ''aabaabaa''}"
+    by (fact border_example)
+  finally show "?l \<subseteq> ?r" by auto
+  show "?r \<subseteq> ?l" by simp eval
+qed
+
+corollary "intrinsic_border ''aabaabaa'' = ''aabaa''"
+proof - \<comment>\<open>We later obtain a fast algorithm for that.\<close>
+  have exhaust: "strict_border b ''aabaabaa'' \<longleftrightarrow> b \<in> {[], ''a'', ''aa'', ''aabaa''}" for b
+    using strict_border_example by auto
+  then have
+    "\<not>is_arg_max length (\<lambda>b. strict_border b ''aabaabaa'') ''''"
+    "\<not>is_arg_max length (\<lambda>b. strict_border b ''aabaabaa'') ''a''"
+    "\<not>is_arg_max length (\<lambda>b. strict_border b ''aabaabaa'') ''aa''"
+    "is_arg_max length (\<lambda>b. strict_border b ''aabaabaa'') ''aabaa''"
+    unfolding is_arg_max_linorder by auto
+  moreover have "strict_border (intrinsic_border ''aabaabaa'') ''aabaabaa''"
+    using intrinsic_borderI' by blast
+  note this[unfolded exhaust]
+  ultimately show ?thesis
+    by simp (metis list.discI nonempty_is_arg_max_ib)
+qed
+
+section\<open>Knuth–Morris–Pratt algorithm\<close>
+
 text\<open>"Intrinsic border length plus one" for prefixes\<close>
 fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-  "iblp1 s 0 = 0"\<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
+  "iblp1 s 0 = 0" \<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
   "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
+
+subsection\<open>Invariants\<close>
+definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
+  (\<forall>ii<i. \<not>sublist_at s t ii) \<and>
+  (case pos of None \<Rightarrow> (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> j < length s
+    | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
+text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
+
+subsection\<open>Algorithm\<close>
+text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
+definition "kmp s t \<equiv> do {
+  ASSERT (s \<noteq> []);
+  let i=0;
+  let j=0;
+  let pos=None;
+  (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+    ASSERT (i + length s \<le> length t);
+    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+      let j=j+1;
+      if j=length s then RETURN (j,Some i) else RETURN (j,None)
+    }) (j,pos);
+    if pos=None then do {
+      ASSERT (j < length s);
+      let i = i + (j - iblp1 s j + 1);
+      let j = max 0 (iblp1 s j - 1); (*max not necessary*)
+      RETURN (i,j,None)
+    } else RETURN (i,j,Some i)
+  }) (i,j,pos);
+
+  RETURN pos
+}"
 
 lemma iblp1_j0[simp]: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
   by (cases j) simp_all
@@ -374,39 +449,6 @@ lemma "p576 et seq":
     sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed?*) and
     i_increase: "i' > i"
   using assignments by (simp_all add: j_le_iblp1_le[OF assms(1), THEN le_imp_less_Suc])
-
-thm longest_common_prefix
-
-subsection\<open>Invariants\<close>
-definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
-  (\<forall>ii<i. \<not>sublist_at s t ii) \<and>
-  (case pos of None \<Rightarrow> (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> j < length s
-    | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
-text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
-
-subsection\<open>Algorithm\<close>
-text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
-definition "kmp s t \<equiv> do {
-  ASSERT (s \<noteq> []);
-  let i=0;
-  let j=0;
-  let pos=None;
-  (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-    ASSERT (i + length s \<le> length t);
-    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
-      let j=j+1;
-      if j=length s then RETURN (j,Some i) else RETURN (j,None)
-    }) (j,pos);
-    if pos=None then do {
-      ASSERT (j < length s);
-      let i = i + (j - iblp1 s j + 1);
-      let j = max 0 (iblp1 s j - 1); (*max not necessary*)
-      RETURN (i,j,None)
-    } else RETURN (i,j,Some i)
-  }) (i,j,pos);
-
-  RETURN pos
-}"
 
 lemma sublist_sublist:
   "\<lbrakk>sublist_at s1 t i; sublist_at s2 t (i + length s1)\<rbrakk> \<Longrightarrow> sublist_at (s1@s2) t i"
@@ -495,7 +537,7 @@ proof (standard, standard)
       then have "\<forall>jj < j+i-ii. (take j s)!jj = (take j s)!(ii-i+jj)"
         using \<open>i<ii\<close> by auto
       with positions_strict_border[of "j+i-ii" "take j s", simplified]
-      have "strict_border (take (j+i-ii) s) (take j s)" by simp
+      have "strict_border (take (j+i-ii) s) (take j s)".
       note intrinsic_border_max[OF this]
       also note contradiction_goal
       also have "j+i-ii \<le> length s" by (fact le_s)
@@ -1042,7 +1084,7 @@ definition "kmp2 s t \<equiv> do {
   RETURN pos
 }"
 
-text\<open>Using @{thm [source] computeBorders2_refine'} (it has @{attribute refine}), the proof is trivial:\<close>
+text\<open>Using @{thm [source] computeBorders2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
 lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
@@ -1069,24 +1111,6 @@ lemma kmp3_correct: "kmp3 s t \<le> kmp_SPEC s t"
   unfolding kmp3_def by (simp add: kmp2_correct) (simp add: kmp_SPEC_def)
 
 (*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
-section\<open>Examples\<close>
-
-lemma ex1: "border a ''a'' \<longleftrightarrow> a\<in>{
-  '''',
-  ''a''
-  }" unfolding border_def apply auto
-    by (meson list_se_match(4) suffixE)
-
-lemma ex2: "border a ''aa'' \<longleftrightarrow> a\<in>{
-  '''',
-  ''a'',
-  ''aa''
-  }"
-  apply (auto simp: border_def)
-   apply (simp add: suffix_Cons)+
-  done
-
-
 section \<open>Refinement to Imperative/HOL\<close>
 
 lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by simp
@@ -1188,4 +1212,5 @@ ML_val \<open>
   (*todo: example where the alphabet is infinite or where equality takes long*)
 
 \<close>
+
 end
