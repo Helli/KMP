@@ -644,7 +644,7 @@ lemma border_step: "border xs ys \<longleftrightarrow> border (xs@[ys!length xs]
 corollary strict_border_step: "strict_border xs ys \<longleftrightarrow> strict_border (xs@[ys!length xs]) (ys@[ys!length xs])"
   unfolding strict_border_def using border_step by auto(*or use proof above*)
 
-corollary strict_border_step':
+corollary strict_border_step': (*rm*)
   assumes "i \<le> length s"
   shows "strict_border (take i s) (take (j-1) s) \<longleftrightarrow> strict_border (take i s @[s!i]) (take (j-1) s @[s!i])"
 proof -
@@ -939,14 +939,17 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     have "border (take (iblp1 s (i-1) - 1) s) (take (i-1) s)"
       by (fact border_take_iblp1)
     also note \<open>strict_border (take (i-1) s) (take (j-1) s)\<close>
-    finally have "strict_border (take (iblp1 s (i-1)-1) s @ [s!(iblp1 s (i-1)-1)]) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])"
-      using strict_border_step' i'_lower less_imp_le_nat by blast
-    then have "strict_border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])"
+    finally have "border (take (iblp1 s (i-1)-1) s @ [s!(iblp1 s (i-1)-1)]) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])" unfolding strict_border_def
+      by (metis append_take_drop_id border_step i'_lower length_take min_simps(2) nth_append_first)
+    then have "border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(iblp1 s (i-1)-1)])"
       by (metis "1"(3,9,10) Suc_diff_1 i'_lower iblp1_j0 less_SucE minus_eq take_Suc_conv_app_nth zero_less_Suc)
-    with \<open>s!(b!(i-1) - 1) = s!(j-1)\<close> have "strict_border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(j-1)])"
+    with \<open>s!(b!(i-1) - 1) = s!(j-1)\<close> have "border (take (iblp1 s (i-1)) s) (take (j-1) s @ [s!(j-1)])"
       using "1"(10) "iblp1 s (i-1) already computed" by auto
-    then have ib_candidate: "strict_border (take (iblp1 s (i-1)) s) (take j s)"
+    then have "border (take (iblp1 s (i-1)) s) (take j s)"
       by (metis "1"(1) "1"(5) "iblp1 s (i-1) already computed" One_nat_def Suc_to_right less_imp_Suc_add not_less_eq take_Suc_conv_app_nth)
+    moreover have "length (take (iblp1 s (i-1)) s) < length (take j s)"
+      by simp (metis (no_types, hide_lams) "iblp1 s (i-1) already computed" One_nat_def duh j_le_iblp1_le le_trans less_imp_le_nat min_def not_le)
+    ultimately have ib_candidate: "strict_border (take (iblp1 s (i-1)) s) (take j s)" unfolding strict_border_def by auto
     then have "iblp1 s j \<ge> iblp1 s (i-1) + 1" using iblp1_max[OF _ ib_candidate]
       by (metis "1"(1) "1"(5) duh j_le_iblp1_le length_take less_Suc_eq_le less_or_eq_imp_le min_absorb2 order_trans)
     with \<open>iblp1 s j \<le> Suc (iblp1 s (i-1))\<close> show ?case
