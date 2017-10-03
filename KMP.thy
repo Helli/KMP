@@ -162,8 +162,8 @@ subsection\<open>Basic form\<close>
 definition "I_out_na s t \<equiv> \<lambda>(i,j,found).
   \<not>found \<and> j = 0 \<and> (\<forall>ii<i. \<not>sublist_at s t ii)
   \<or> found \<and> sublist_at s t i"
-definition "I_in_na s t iout \<equiv> \<lambda>(j,found).
-  (\<forall>jj<j. t!(iout+jj) = s!(jj)) \<and> (if found then j = length s else j < length s)"
+definition "I_in_na s t i \<equiv> \<lambda>(j,found).
+  (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> (if found then j = length s else j < length s)"
 
 definition "na s t \<equiv> do {
   let i=0;
@@ -256,6 +256,12 @@ interpretation border_order: order border strict_border
   by standard (auto simp: border_def suffix_def strict_border_def)
 interpretation border_bot: order_bot Nil border strict_border
   by standard (simp add: border_def)
+
+lemma borderE[elim](*rm?*):
+  fixes xs ys :: "'a list"
+  assumes "border xs ys"
+  obtains "prefix xs ys" and "suffix xs ys"
+  using assms unfolding border_def by blast
 
 lemma strict_borderE[elim]:
   fixes xs ys :: "'a list"
@@ -747,12 +753,12 @@ corollary generalisation: "1 \<le> j \<Longrightarrow> j \<le> length s \<Longri
 (*Todo: Needs to be pimped aswell*)
 
 thm border_positions
-corollary intrinsic_border_positions: "length (intrinsic_border w) = l
-  \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j)"
+corollary intrinsic_border_positions: "length (intrinsic_border ls) = l
+  \<Longrightarrow> \<forall>i<l. ls!i = ls!(length ls - l + i)"
   by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
 
-corollary intrinsic_border_positions': "length (intrinsic_border w) + 1 = l
-  \<Longrightarrow> \<forall>j<l-1. w!j = w!(length w + 1 - l + j)"
+corollary intrinsic_border_positions': "length (intrinsic_border ls) + 1 = l
+  \<Longrightarrow> \<forall>i<l-1. ls!i = ls!(length ls + 1 - l + i)"
   using intrinsic_border_positions by fastforce
 
 thm intrinsic_border_positions'[of "take (Suc j) s", folded iblp1.simps]
@@ -778,7 +784,7 @@ subsubsection\<open>Computing @{const iblp1}\<close>
 definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
   length s + 1 = length b \<and>
   (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-  b!(j-1) = i \<and> (*needed?*)
+  b!(j-1) = i \<and>
   0 < j"
 definition "I_in_cb s j \<equiv> \<lambda>i.
   if j>1(*swap branches*)
