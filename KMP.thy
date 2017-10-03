@@ -924,7 +924,7 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     by blast
   subgoal by auto
   subgoal using border_bot.bot.not_eq_extremum strict_border_imp_nonempty by blast
-  subgoal by (auto intro: border_take_lengths simp: le_eq_less_or_eq)
+  subgoal by (auto intro: border_take_lengths cong: le_eq_less_or_eq)
   subgoal by (rule iblp1_strict_borderI; auto)
   subgoal for b j i
   proof goal_cases
