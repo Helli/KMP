@@ -13,31 +13,25 @@ lemma nat_min_absorb_Suc[simp]: (*rm?*)
   by simp_all
 
 section\<open>Specification\<close>
+
 subsection\<open>Sublist-predicate with a position check\<close>
+
 subsubsection\<open>Definition\<close>
+
+text \<open>One could define\<close>
 definition "sublist_at' s t i \<equiv> take (length s) (drop i t) = s"  
 
-text\<open>Problem:\<close>
+text\<open>However, this doesn't handle out-of-bound indexes uniformly:\<close>
 value[nbe] "sublist_at' [] [a] 5"
 value[nbe] "sublist_at' [a] [a] 5"
-value[nbe] "sublist_at' [] [] 3"
-text\<open>Not very intuitive...\<close>
+value[nbe] "sublist_at' [] [] 5"
 
-text\<open>For the moment, we use this instead:\<close>
+text\<open>Instead, we use a recursive definition:\<close>
 fun sublist_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-  t1: "sublist_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> sublist_at ss ts 0" |
-  t2: "sublist_at ss (t#ts) (Suc i) \<longleftrightarrow> sublist_at ss ts i" |
+  "sublist_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> sublist_at ss ts 0" |
+  "sublist_at ss (t#ts) (Suc i) \<longleftrightarrow> sublist_at ss ts i" |
   "sublist_at [] t 0 \<longleftrightarrow> True" |
   "sublist_at _ [] _ \<longleftrightarrow> False"
-
-lemmas [code del] = t1 t2
-lemma [code]:
-  "sublist_at ss (t#ts) i \<longleftrightarrow>
-    (if i=0 \<and> ss\<noteq>[] then t=hd ss \<and> sublist_at (tl ss) ts 0 else sublist_at ss ts (i-1))"  
-  "sublist_at ss [] i \<longleftrightarrow> ss=[] \<and> i=0"
-  by (cases ss; cases i; auto)+
-
-export_code sublist_at(*test*)
 
 text\<open>For all relevant cases, both definitions agree:\<close>
 lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> sublist_at' s t i"
@@ -47,11 +41,9 @@ lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow>
 text\<open>However, the new definition has some reasonable properties:\<close>
 subsubsection\<open>Properties\<close>
 lemma sublist_lengths: "sublist_at s t i \<Longrightarrow> i + length s \<le> length t"
-  apply (induction s t i rule: sublist_at.induct)
-  apply simp_all
-  done
+  by (induction s t i rule: sublist_at.induct) auto
 
-lemma Nil_is_sublist: "i \<le> length t \<longleftrightarrow> sublist_at ([] :: 'y list) t i"
+lemma Nil_is_sublist: "sublist_at ([] :: 'y list) t i \<longleftrightarrow> i \<le> length t"
   by (induction "[] :: 'y list" t i rule: sublist_at.induct) auto
 
 text\<open>Furthermore, we need:\<close>
@@ -71,39 +63,16 @@ next
   from \<open>i + length (xs @ [x]) \<le> length t\<close> have "i + length xs \<le> length t" by simp
   moreover have "\<forall>jj<length xs. t ! (i + jj) = xs ! jj"
     by (simp add: nth_append snoc.prems(2))
-  ultimately have f: "sublist_at xs t i"
+  ultimately have "sublist_at xs t i"
     using snoc.IH by simp
-  show ?case
-    apply (rule sublist_step)
-    using snoc.prems(1) snoc.prems(2) apply auto[]
-    apply (fact f)
-    by (simp add: snoc.prems(2))
+  then show ?case
+    using snoc.prems by (auto intro: sublist_step)
 qed
 
-lemma sublist_all_positions:
-  "sublist_at s t i \<Longrightarrow> \<forall>jj<length s. t!(i+jj) = s!jj"
-  by (induction s t i rule: sublist_at.induct)
-    (auto simp: nth_Cons')
+lemma sublist_all_positions: "sublist_at s t i \<Longrightarrow> \<forall>jj<length s. t!(i+jj) = s!jj"
+  by (induction s t i rule: sublist_at.induct) (auto simp: nth_Cons')
 
-subsubsection\<open>Other characterisations\<close>
-fun slice :: "'a list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> 'a list" 
-  where
-  "slice (x#xs) (Suc n) l = slice xs n l"
-| "slice (x#xs) 0 (Suc l) = x # slice xs 0 l"  
-| "slice _ _ _ = []"  
-
-lemma slice_char_aux: "sublist_at s t 0 \<longleftrightarrow> s = slice t 0 (length s)"
-  apply (induction t arbitrary: s)
-  subgoal for s by (cases s) auto  
-  subgoal for _ _ s by (cases s) auto  
-  done    
-
-lemma slice_char: "i\<le>length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> s = slice t i (length s)"
-  apply (induction s t i rule: sublist_at.induct) 
-  apply (auto simp: slice_char_aux)
-  done
-
-text\<open>In the style of @{theory Sublist} (compare @{thm[source] sublist_def}):\<close>
+text\<open>It also connects well to theory @{theory Sublist} (compare @{thm[source] sublist_def}):\<close>
 lemma sublist_at_altdef:
   "sublist_at xs ys i \<longleftrightarrow> (\<exists>ps ss. ys = ps@xs@ss \<and> i = length ps)"
 proof (induction xs ys i rule: sublist_at.induct)
@@ -129,9 +98,6 @@ qed auto
 corollary sublist_iff_sublist_at: "Sublist.sublist s t \<longleftrightarrow> (\<exists>i. sublist_at s t i)"
   by (simp add: sublist_at_altdef Sublist.sublist_def)
 
-lemma sublist_at_empty[simp]: "sublist_at [] ys 0"
-  by simp
-
 subsection\<open>Sublist-check algorithms\<close>
 
 definition "kmp_SPEC s t = SPEC (\<lambda>
@@ -144,7 +110,7 @@ lemma is_arg_min_id: "is_arg_min id P i \<longleftrightarrow> P i \<and> (\<fora
 lemma kmp_result: "kmp_SPEC s t =
   RETURN (if sublist s t then Some (LEAST i. sublist_at s t i) else None)"
   unfolding kmp_SPEC_def sublist_iff_sublist_at
-  apply (auto simp: intro: LeastI dest: not_less_Least split: option.splits)
+  apply (auto intro: LeastI dest: not_less_Least split: option.splits)
   by (meson LeastI nat_neq_iff not_less_Least)
 
 corollary weak_kmp_SPEC: "kmp_SPEC s t \<le> SPEC (\<lambda>p. p\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
@@ -171,7 +137,6 @@ definition "na s t \<equiv> do {
   let found=False;
   (_,_,found) \<leftarrow> WHILEIT (I_out_na s t) (\<lambda>(i,j,found). i \<le> length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
     (j,found) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
-      (*ToDo: maybe instead of \<not>found directly query j<length s ?*)
       let j=j+1;
       if j=length s then RETURN (j,True) else RETURN (j,False)
     }) (j,found);
