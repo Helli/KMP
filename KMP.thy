@@ -248,7 +248,7 @@ lemma strict_border_prefix: "strict_border xs ys \<Longrightarrow> strict_prefix
 lemma border_length_le: "border xs ys \<Longrightarrow> length xs \<le> length ys"
   unfolding border_def by (simp add: prefix_length_le)
 
-lemma border_length_r_less: "\<forall>xs. strict_border xs ys \<longrightarrow> length xs < length ys"
+lemma border_length_r_less (*rm*): "\<forall>xs. strict_border xs ys \<longrightarrow> length xs < length ys"
   using strict_borderE by auto
 
 lemma border_positions: "border xs ys \<Longrightarrow> \<forall>i<length xs. ys!i = ys!(length ys - length xs + i)"
@@ -622,7 +622,7 @@ proof -
     then have ?thesis
       by (metis (no_types) length_take strict_border_step) }
   ultimately show ?thesis
-    by (metis (no_types) Suc_less_eq length_append_singleton length_take min_less_iff_conj strict_border_def)
+    by (auto simp: strict_border_def)
 qed
 
 lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
@@ -871,14 +871,13 @@ lemma skipping_ok:
 
 lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
-  apply simp
-  apply (refine_vcg
+  apply (simp, refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
     WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
   apply (vc_solve, fold One_nat_def)
   subgoal by (rule strict_border_take_iblp1, auto)
-  subgoal by (metis Suc_eq_plus1 generalisation less_Suc_eq_le less_imp_le_nat)
+  subgoal for b j by (metis Suc_eq_plus1 generalisation less_Suc_eq_le less_imp_le_nat)
   subgoal by (metis One_nat_def diff_is_0_eq iblp1_j0 less_not_refl2 linorder_not_less)
   subgoal by (rule strict_border_take_iblp1; use leI in fastforce)
   subgoal for b j apply (unfold Suc_eq_plus1)
