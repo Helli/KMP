@@ -746,39 +746,6 @@ lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) 
 
 text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
 subsubsection\<open>Computing @{const iblp1}\<close>
-definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
-  length s + 1 = length b \<and>
-  (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-  b!(j-1) = i \<and>
-  0 < j"
-definition "I_in_cb s j \<equiv> \<lambda>i.
-  if j>1(*swap branches*)
-  then strict_border (take (i-1) s) (take (j-1) s) \<and> (
-    if i=0 \<or> s!(i-1) = s!(j-1)(*swap branches*)
-    then iblp1 s j = i + 1
-    else iblp1 s j \<le> iblp1 s (i-1) + 1)
-  else i=0"
-
-definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
-  "computeBorders s = do {
-  let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
-  let i=0;
-  let j=1;
-  (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
-    i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length b);
-      let i=b!(i-1);
-      RETURN i
-    }) i;
-    let i=i+1;
-    ASSERT (j < length b);
-    let b=b[j:=i];
-    let j=j+1;
-    RETURN (b,i,j)
-  }) (b,i,j);
-  
-  RETURN b
-}"
 
 lemma skipping_ok:
   assumes bounds[simp]: "1 < j" "j \<le> length s"
@@ -897,6 +864,40 @@ proof -
   with \<open>iblp1 s j \<le> x + 1\<close> show ?thesis
     using le_antisym by presburger
 qed
+
+definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
+  length s + 1 = length b \<and>
+  (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
+  b!(j-1) = i \<and>
+  0 < j"
+definition "I_in_cb s j \<equiv> \<lambda>i.
+  if j>1(*swap branches*)
+  then strict_border (take (i-1) s) (take (j-1) s) \<and> (
+    if i=0 \<or> s!(i-1) = s!(j-1)(*swap branches*)
+    then iblp1 s j = i + 1
+    else iblp1 s j \<le> iblp1 s (i-1) + 1)
+  else i=0"
+
+definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
+  "computeBorders s = do {
+  let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
+  let i=0;
+  let j=1;
+  (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
+    i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      ASSERT (i-1 < length b);
+      let i=b!(i-1);
+      RETURN i
+    }) i;
+    let i=i+1;
+    ASSERT (j < length b);
+    let b=b[j:=i];
+    let j=j+1;
+    RETURN (b,i,j)
+  }) (b,i,j);
+  
+  RETURN b
+}"
 
 lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
