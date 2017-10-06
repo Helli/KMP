@@ -861,9 +861,10 @@ definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
   b!(j-1) = i \<and>
   0 < j"
 definition "I_in_cb s j \<equiv> \<lambda>i.
-  if j>1(*swap branches*)
-  then strict_border (take (i-1) s) (take (j-1) s) \<and> iblp1 s j \<le> i + 1
-  else i=0"
+  if j=1 then i=0 (* first iteration *)
+  else
+    strict_border (take (i-1) s) (take (j-1) s) \<and>
+    iblp1 s j \<le> i + 1"
 
 definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
   "computeBorders s = do {
@@ -892,28 +893,17 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
     WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
     WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
-  apply (vc_solve, fold One_nat_def)
+                      apply (vc_solve, fold One_nat_def)
   subgoal for b j by (rule strict_border_take_iblp1, auto)
-  apply (metis Suc_eq_plus1 iblp1_step_bound less_Suc_eq_le)
-       apply fastforce
-      apply (metis (no_types, lifting) One_nat_def Suc_lessD Suc_pred border_length_r_less iblp1_strict_borderI length_take less_Suc_eq less_Suc_eq_le min.absorb2)
+  subgoal by (metis Suc_eq_plus1 iblp1_step_bound less_Suc_eq_le)
+  subgoal by fastforce
+  subgoal
+    by (metis (no_types, lifting) One_nat_def Suc_lessD Suc_pred border_length_r_less iblp1_strict_borderI length_take less_Suc_eq less_Suc_eq_le min.absorb2)
   subgoal for b j i
-  proof goal_cases
-    case 1
-    then have a: "Suc (b!(i-1)) = iblp1 s (i-1) + 1"
-      by (metis One_nat_def Suc_eq_plus1_left Suc_lessD Suc_pred ab_semigroup_add_class.add.commute border_order.less_imp_le border_take_lengths less_Suc_eq_le)
-    from 1 skipping_ok show ?case unfolding a strict_border_take_iblp1 
-      by (metis Suc_eq_plus1 less_Suc_eq_le)
-  qed
-  apply (metis One_nat_def Suc_lessD Suc_pred border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_border_def)
+    by (metis (no_types, lifting) One_nat_def Suc_diff_1 Suc_eq_plus1 Suc_leI border_take_lengths less_Suc_eq_le less_antisym skipping_ok strict_border_def)
+  subgoal by (metis Suc_diff_1 border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_border_def)
   subgoal for b j i jj
-    apply auto
-    apply (metis Suc_eq_plus1_left Suc_less_eq ab_semigroup_add_class.add.commute gr_implies_not_zero iblp1.simps(2) j_le_iblp1_le less_antisym nat_less_le nth_list_update_eq nth_list_update_neq)
-  apply (metis iblp1_j0 le_SucE le_zero_eq less_Suc_eq nth_list_update order.asym)
-  apply (metis iblp1_j0 le_SucE le_zero_eq less_Suc_eq neq0_conv nth_list_update)
-  apply (metis One_nat_def Suc_eq_plus1 Suc_leI diff_is_0_eq' generalisation iblp1.simps(1) le_numeral_extra(1) less_Suc_eq less_Suc_eq_le nth_list_update_eq nth_list_update_neq)
-  apply (metis One_nat_def Suc_eq_plus1 extend_border less_Suc_eq less_Suc_eq_le nth_list_update)
-    by (metis iblp1_j0 le_SucE le_zero_eq less_Suc_eq neq0_conv nth_list_update)
+    by (metis Suc_eq_plus1 Suc_eq_plus1_left add.right_neutral extend_border iblp1_j0 j_le_iblp1_le le_zero_eq less_Suc_eq less_Suc_eq_le nth_list_update_eq nth_list_update_neq)
   by linarith
 
 text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
