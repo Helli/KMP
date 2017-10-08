@@ -555,22 +555,16 @@ lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply vc_solve
   done
 
-lemma todoname[simp]:
+lemma take_length_ib[simp]:
   assumes "0 < j" "j \<le> length s"
     shows "take (length (intrinsic_border (take j s))) s = intrinsic_border (take j s)"
 proof -
-  have "length (intrinsic_border (take j s)) < j"
-    by (metis \<open>0 < j\<close> \<open>j \<le> length s\<close> intrinsic_border_less length_greater_0_conv length_take min_absorb2)
-  also note \<open>j \<le> length s\<close>
-  finally have "length (intrinsic_border (take j s)) < length s".
-  moreover {
-    from assms have "prefix (intrinsic_border (take j s)) (take j s)"
-      by (metis "needed?" \<open>0 < j\<close> \<open>j \<le> length s\<close> border_def linorder_not_less list.size(3) strict_border_def take_eq_Nil zero_order(1))
-    also have "prefix (take j s) s" by (simp add: \<open>j \<le> length s\<close> take_is_prefix)
-    finally have "prefix (intrinsic_border (take j s)) s".
-  }
-  ultimately show ?thesis
-    by (metis append_eq_conv_conj prefix_def)
+  from assms have "prefix (intrinsic_border (take j s)) (take j s)"
+    by (metis "needed?" border_def list.size(3) neq0_conv not_less strict_border_def take_eq_Nil)
+  also have "prefix (take j s) s"
+    by (simp add: \<open>j \<le> length s\<close> take_is_prefix)
+  finally show ?thesis
+    by (metis append_eq_conv_conj prefixE)
 qed
 
 lemma ib1[simp]: "intrinsic_border [z] = []"
@@ -648,7 +642,7 @@ corollary intrinsic_border_positions: "length (intrinsic_border ls) = l
 
 lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
-  by (metis border_order.order.strict_implies_order intrinsic_borderI' intrinsic_border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil todoname zero_less_Suc)
+  by (metis "needed?" border_order.eq_iff border_order.less_imp_le border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil take_length_ib zero_less_Suc)
 
 corollary iblp1_strict_borderI: "y = iblp1 s (i - 1) \<Longrightarrow> strict_border (take (i - 1) s) (take (j - 1) s) \<Longrightarrow> strict_border (take (y - 1) s) (take (j - 1) s)"
   using border_order.less_le_not_le border_order.order.trans border_take_iblp1 by blast
