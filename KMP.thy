@@ -607,9 +607,6 @@ proof -
     by (auto simp: strict_border_def)
 qed
 
-lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
-  using border_step intrinsic_borderI' strict_border_def by blast
-
 lemma ib_butlast: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
 proof -
   assume "length w \<ge> 2"
@@ -634,11 +631,6 @@ lemma iblp1_step_bound(*rm*):
   shows "iblp1 w j \<le> iblp1 w (j-1) + 1"
   using assms[THEN j_le_iblp1_le] iblp1_Suc assms
   by (metis One_nat_def Suc_pred iblp1.elims less_Suc_eq_le zero_less_Suc)
-
-thm border_positions
-corollary intrinsic_border_positions: "length (intrinsic_border ls) = l
-  \<Longrightarrow> \<forall>i<l. ls!i = ls!(length ls - l + i)"
-  by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
 
 lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
