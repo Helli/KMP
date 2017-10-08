@@ -594,11 +594,6 @@ lemma border_butlast: "border xs ys \<Longrightarrow> border (butlast xs) (butla
 corollary strict_border_butlast: "xs \<noteq> [] \<Longrightarrow> strict_border xs ys \<Longrightarrow> strict_border (butlast xs) (butlast ys)"
   unfolding strict_border_def by (simp add: border_butlast less_diff_conv)
 
-lemma border_take: "j \<le> length xs \<Longrightarrow> border xs ys \<Longrightarrow> border (take j xs) (take j ys)"
-  apply (auto simp: border_def)
-   apply (metis prefixE prefix_def take_append)
-  by (metis append_Nil2 diff_is_0_eq' prefixE suffix_order.eq_iff take_0 take_append)
-
 lemma border_take_lengths: "i \<le> length s \<Longrightarrow> border (take i s) (take j s) \<Longrightarrow> i \<le> j"
   using border_length_le by fastforce
 
@@ -630,9 +625,6 @@ qed
 lemma intrinsic_border_step: "w \<noteq> [] \<Longrightarrow> intrinsic_border w = r \<Longrightarrow> border (r@[w!length r]) (w@[w!length r])"
   using border_step intrinsic_borderI' strict_border_def by blast
 
-lemma intrinsic_border_step': "w \<noteq> [] \<Longrightarrow>  border (intrinsic_border w @[w!length (intrinsic_border w)]) (w@[w!length (intrinsic_border w)])"
-  using intrinsic_border_step by blast
-
 lemma ib_butlast: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
 proof -
   assume "length w \<ge> 2"
@@ -646,9 +638,6 @@ proof -
   then show ?thesis
     by simp
 qed
-
-corollary length_ib_take:(*rm*) "2 \<le> j \<Longrightarrow> j \<le> length w \<Longrightarrow> length (intrinsic_border (take j w)) \<le> length (intrinsic_border (take (j-1) w)) + 1"
-  by (metis butlast_take ib_butlast length_take min.absorb2)
 
 corollary iblp1_Suc(*rm*): "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc i) \<le> iblp1 w i + 1"
   apply (cases i)
@@ -664,74 +653,13 @@ lemma iblp1_step_bound(*rm*):
   using assms[THEN j_le_iblp1_le] iblp1_Suc assms
   by (metis One_nat_def Suc_pred iblp1.elims less_Suc_eq_le zero_less_Suc)
 
-lemma intrinsic_border_step'':
-  assumes
-    "w \<noteq> []"
-    "intrinsic_border w = r"
-  shows
-    "intrinsic_border (w@[w!length r]) = (r@[w!length r])"
-proof-
-  {
-    assume "length (intrinsic_border (w @ [w ! length r])) > length (r@[w!length r])"
-    then have "\<not> length (intrinsic_border (w @ [w ! length r])) \<le> length r + 1"
-      by auto
-    with assms have "length (intrinsic_border w) > length r"
-      using sus by blast
-    with \<open>intrinsic_border w = r\<close> have False by simp
-  }
-  with assms show ?thesis
-    using intrinsic_border_step intrinsic_border_max border_def border_step strict_border_step
-    by (metis (no_types, lifting) "needed?" Nil_is_append_conv append_eq_append_conv diff_diff_cancel diff_zero not_gr0 prefix_def zero_less_diff)
-qed
-
-lemma weird_bracket_swap: "w \<noteq> [] \<Longrightarrow>
-  intrinsic_border (w @ [w ! length (intrinsic_border w)]) = (intrinsic_border w) @ [w ! length (intrinsic_border w)]"
-  by (simp add: intrinsic_border_step'')
-
-lemma weird_bracket_swap': "butlast w \<noteq> [] \<Longrightarrow> last w = butlast w ! length (intrinsic_border (butlast w)) \<Longrightarrow> intrinsic_border w = (intrinsic_border (butlast w)) @ [butlast w ! length (intrinsic_border (butlast w))]"
-  by (metis append_butlast_last_id butlast.simps(1) intrinsic_border_step''[of "butlast w"])
-
-lemma weird_bracket_swap'': "butlast w \<noteq> [] \<Longrightarrow> last w = w ! length (intrinsic_border (butlast w)) \<Longrightarrow> intrinsic_border w = (intrinsic_border (butlast w)) @ [w! length (intrinsic_border (butlast w))]"
-  by (metis intrinsic_border_less nth_butlast weird_bracket_swap')
-
-lemma weird_bracket_swap''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (butlast (take j s))) \<Longrightarrow> intrinsic_border (take j s) = intrinsic_border (butlast (take j s)) @ [take j s ! length (intrinsic_border (butlast (take j s)))]"
-  by (metis (no_types, lifting) One_nat_def add_leD1 last_take_nth_conv length_butlast length_ge_1_conv length_take min.absorb2 not_numeral_le_zero one_add_one ordered_cancel_comm_monoid_diff_class.le_diff_conv2 weird_bracket_swap'')
-
-lemma weird_bracket_swap'''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> intrinsic_border (take j s) = intrinsic_border (take (j-1) s) @ [take j s ! length (intrinsic_border (take (j-1) s))]"
-  by (simp add: butlast_take weird_bracket_swap''')
-
-lemma weird_bracket_swap''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> length (intrinsic_border (take j s)) = length (intrinsic_border (take (j-1) s)) + 1"
-  by (simp add: butlast_take weird_bracket_swap''')
-
-lemma weird_bracket_swap'''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! length (intrinsic_border (take (j-1) s)) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
-  by (metis One_nat_def Suc_le_eq add_le_imp_le_diff iblp1.elims less_imp_le_nat not_one_le_zero numerals(2) one_add_one weird_bracket_swap''''')
-
-lemma weird_bracket_swap''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = take j s ! (iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
-  by (metis add_le_imp_le_diff diff_add_inverse2 iblp1.elims not_one_le_zero one_add_one weird_bracket_swap'''''')
-
 lemma h: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> take j s ! (iblp1 s (j-1) - 1) = s ! (iblp1 s (j-1) - 1)"
   by (metis One_nat_def diff_le_self nonempty_iblp1_le leI length_greater_0_conv less_le_trans nth_take numeral_2_eq_2 nz_le_conv_less zero_less_Suc)
-
-lemma weird_bracket_swap'''''''': "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
-  by (metis h weird_bracket_swap''''''')
-
-corollary generalisation: "1 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> s!(j-1) = s!(iblp1 s (j-1) - 1) \<Longrightarrow> iblp1 s j = iblp1 s (j-1) + 1"
-  by (cases "j = 1") (simp_all add: weird_bracket_swap'''''''' take_Suc0)
-(*Todo: Needs to be pimped aswell*)
 
 thm border_positions
 corollary intrinsic_border_positions: "length (intrinsic_border ls) = l
   \<Longrightarrow> \<forall>i<l. ls!i = ls!(length ls - l + i)"
   by (metis add_cancel_left_left border_positions border_step intrinsic_border_step length_0_conv minus_eq)
-
-corollary intrinsic_border_positions': "length (intrinsic_border ls) + 1 = l
-  \<Longrightarrow> \<forall>i<l-1. ls!i = ls!(length ls + 1 - l + i)"
-  using intrinsic_border_positions by fastforce
-
-thm intrinsic_border_positions'[of "take (Suc j) s", folded iblp1.simps]
-
-lemma yo: "\<forall>jj<iblp1 s (Suc j) - 1. take (Suc j) s ! jj = take (Suc j) s ! (length (take (Suc j) s) + 1 - iblp1 s (Suc j) + jj)"
-  by (simp add: intrinsic_border_positions')
 
 lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
