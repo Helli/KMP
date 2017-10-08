@@ -390,15 +390,6 @@ lemma j_le_iblp1_le: "j \<le> length s \<Longrightarrow> iblp1 s j \<le> j"
   apply simp_all
   by (metis Suc_leI intrinsic_border_less length_take list.size(3) min.absorb2 nat.simps(3) not_less)
 
-lemma nonempty_iblp1_le:
-  assumes "s \<noteq> []"
-  shows "iblp1 s j \<le> j"
-  apply (cases "j \<le> length s")
-   apply (simp_all add: j_le_iblp1_le)
-  apply (cases j)
-  apply (simp_all)
-  by (meson Suc_leI assms intrinsic_border_less less_trans not_le_imp_less)
-
 lemma j_le_iblp1_le': "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - 1 < j"
   by (metis diff_less j_le_iblp1_le le_eq_less_or_eq less_imp_diff_less less_one)
 
@@ -644,17 +635,11 @@ corollary iblp1_Suc(*rm*): "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc 
    apply (simp_all add: take_Suc0)
   by (metis One_nat_def Suc_eq_plus1 Suc_to_right butlast_take diff_is_0_eq ib_butlast length_take min.absorb2 nat.simps(3) not_less_eq_eq numerals(2))
 
-lemma sus: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border (w@[w!length (intrinsic_border w)])) \<le> length (intrinsic_border w) + 1"
-  by (metis Suc_le_mono butlast_snoc ib_butlast length_append_singleton length_ge_1_conv numerals(2))
-
 lemma iblp1_step_bound(*rm*):
   assumes "j \<le> length w"
   shows "iblp1 w j \<le> iblp1 w (j-1) + 1"
   using assms[THEN j_le_iblp1_le] iblp1_Suc assms
   by (metis One_nat_def Suc_pred iblp1.elims less_Suc_eq_le zero_less_Suc)
-
-lemma h: "2 \<le> j \<Longrightarrow> j \<le> length s \<Longrightarrow> take j s ! (iblp1 s (j-1) - 1) = s ! (iblp1 s (j-1) - 1)"
-  by (metis One_nat_def diff_le_self nonempty_iblp1_le leI length_greater_0_conv less_le_trans nth_take numeral_2_eq_2 nz_le_conv_less zero_less_Suc)
 
 thm border_positions
 corollary intrinsic_border_positions: "length (intrinsic_border ls) = l
