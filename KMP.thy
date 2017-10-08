@@ -591,22 +591,6 @@ lemma border_step: "border xs ys \<longleftrightarrow> border (xs@[ys!length xs]
 corollary strict_border_step: "strict_border xs ys \<longleftrightarrow> strict_border (xs@[ys!length xs]) (ys@[ys!length xs])"
   unfolding strict_border_def using border_step by auto(*or use proof above*)
 
-corollary strict_border_step': (*rm*)
-  assumes "i \<le> length s"
-  shows "strict_border (take i s) (take (j-1) s) \<longleftrightarrow> strict_border (take i s @[s!i]) (take (j-1) s @[s!i])"
-proof -
-  have "s ! min (length s) i = s ! i"
-    by (metis assms min.absorb2)
-  moreover
-  { assume "min (length s) i < j - 1 \<and> s ! min (length s) i = s ! i"
-    then have "take (j - 1) s ! min (length s) i = s ! i"
-      by (metis nth_take)
-    then have ?thesis
-      by (metis (no_types) length_take strict_border_step) }
-  ultimately show ?thesis
-    by (auto simp: strict_border_def)
-qed
-
 lemma ib_butlast: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
 proof -
   assume "length w \<ge> 2"
@@ -729,30 +713,24 @@ lemma skipping_ok:
 
 lemma extend_border:
   assumes "j \<le> length s"
-  assumes "s!(x-1) = s!(j-1)"
-  assumes "strict_border (take (x-1) s) (take (j-1) s)"
-  assumes "iblp1 s j \<le> x + 1"
-  shows "iblp1 s j = x + 1"
+  assumes "s!(i-1) = s!(j-1)"
+  assumes "strict_border (take (i-1) s) (take (j-1) s)"
+  assumes "iblp1 s j \<le> i + 1"
+  shows "iblp1 s j = i + 1"
 proof -
-  have i'_lower: "x - 1 < length s "
-    using assms(3) border_length_r_less min_less_iff_conj by auto
-  from  assms(3) have "border (take (x-1) s @ [s!(x-1)]) (take (j-1) s @ [s!(x-1)])"
-    by (metis border_order.less_imp_le i'_lower less_imp_le_nat strict_border_step')
-  then have "border (take x s) (take (j-1) s @ [s!(x-1)])"
-    by (metis Suc_diff_Suc Suc_eq_plus1 add.left_neutral border_bot.bot.extremum diff_zero i'_lower length_greater_0_conv length_take min_less_iff_conj take_Suc_conv_app_nth)
-  with \<open>s!(x-1) = s!(j-1)\<close> have "border (take x s) (take (j-1) s @ [s!(j-1)])" by auto
-  then have "border (take x s) (take j s)"
-    by (metis One_nat_def Suc_pred assms(1) assms(3) border_length_r_less diff_le_self length_take less_le_trans min_less_iff_conj nz_le_conv_less take_Suc_conv_app_nth zero_less_diff)
-  moreover have "length (take x s) < length (take j s)
-    "apply (cases "x=0")
-    using assms(3) le_numeral_extra(1) apply auto[1]
-    using assms(1) assms(3) butlast_take gr_zeroI apply auto
-    done
-  ultimately have ib_candidate: "strict_border (take x s) (take j s)"
-    unfolding strict_border_def by auto
-  then have "iblp1 s j \<ge> x + 1" using iblp1_max[OF _ ib_candidate]
-    using Suc_leI assms(1) by fastforce
-  with \<open>iblp1 s j \<le> x + 1\<close> show ?thesis
+  from assms(3) have pos_in_range: "i - 1 < length s " "length (take (i-1) s) = i - 1"
+    using border_length_r_less min_less_iff_conj by auto
+  with strict_border_step[THEN iffD1, OF assms(3)] have "strict_border (take (i-1) s @ [s!(i-1)]) (take (j-1) s @ [s!(i-1)])"
+    by (metis assms(3) border_length_r_less length_take min_less_iff_conj nth_take)
+  with pos_in_range have "strict_border (take i s) (take (j-1) s @ [s!(i-1)])"
+    by (metis Suc_eq_plus1 Suc_pred add.left_neutral border_bot.bot.not_eq_extremum border_order.less_asym neq0_conv take_0 take_Suc_conv_app_nth)
+  then have "strict_border (take i s) (take (j-1) s @ [s!(j-1)])"
+    by (simp only: \<open>s!(i-1) = s!(j-1)\<close>)
+  then have "strict_border (take i s) (take j s)"
+    by (metis One_nat_def Suc_pred assms(1,3) diff_le_self less_le_trans neq0_conv nz_le_conv_less strict_border_imp_nonempty take_Suc_conv_app_nth take_eq_Nil)
+  with iblp1_max[OF assms(1) this] have "iblp1 s j \<ge> i + 1"
+    using Suc_leI by fastforce
+  with \<open>iblp1 s j \<le> i + 1\<close> show ?thesis
     using le_antisym by presburger
 qed
 
