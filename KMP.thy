@@ -906,7 +906,8 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   subgoal by (metis Suc_diff_1 border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_border_def)
   subgoal for b j i jj
     by (metis Suc_eq_plus1 Suc_eq_plus1_left add.right_neutral extend_border iblp1_j0 j_le_iblp1_le le_zero_eq less_Suc_eq less_Suc_eq_le nth_list_update_eq nth_list_update_neq)
-  by linarith
+  subgoal by linarith
+  done
 
 text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
