@@ -46,7 +46,7 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-*.thy~
+*~
 refine_slides.pdf
 FPMiS.pdf
 output/*

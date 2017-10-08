@@ -5,3 +5,4 @@ session "KMP" = "Sepref_IICF" +
 	KMP
   document_files
     "root.tex"
+    "root.bib"

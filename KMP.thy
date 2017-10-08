@@ -5,6 +5,8 @@ theory KMP
     "HOL-Library.Code_Char"
 begin
 
+text\<open>Test. @{cite "Refine_Imperative_HOL-AFP"} Working? Test 2 @{cite FPMIS}. Bla @{cite GAD}\<close>
+
 declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
 no_notation Ref.update ("_ := _" 62)
 lemma nat_min_absorb_Suc[simp]: (*rm?*)
