@@ -21,7 +21,7 @@ subsection\<open>Sublist-predicate with a position check\<close>
 subsubsection\<open>Definition\<close>
 
 text \<open>One could define\<close>
-definition "sublist_at' s t i \<equiv> take (length s) (drop i t) = s"  
+definition "sublist_at' xs ys i \<equiv> take (length xs) (drop i ys) = xs"  
 
 text\<open>However, this doesn't handle out-of-bound indexes uniformly:\<close>
 value[nbe] "sublist_at' [] [a] 5"
@@ -30,49 +30,49 @@ value[nbe] "sublist_at' [] [] 5"
 
 text\<open>Instead, we use a recursive definition:\<close>
 fun sublist_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow> bool" where
-  "sublist_at (s#ss) (t#ts) 0 \<longleftrightarrow> t=s \<and> sublist_at ss ts 0" |
-  "sublist_at ss (t#ts) (Suc i) \<longleftrightarrow> sublist_at ss ts i" |
-  "sublist_at [] t 0 \<longleftrightarrow> True" |
+  "sublist_at (x#xs) (y#ys) 0 \<longleftrightarrow> x=y \<and> sublist_at xs ys 0" |
+  "sublist_at xs (y#ys) (Suc i) \<longleftrightarrow> sublist_at xs ys i" |
+  "sublist_at [] ys 0 \<longleftrightarrow> True" |
   "sublist_at _ [] _ \<longleftrightarrow> False"
 
 text\<open>For all relevant cases, both definitions agree:\<close>
-lemma "i \<le> length t \<Longrightarrow> sublist_at s t i \<longleftrightarrow> sublist_at' s t i"
+lemma "i \<le> length ys \<Longrightarrow> sublist_at xs ys i \<longleftrightarrow> sublist_at' xs ys i"
   unfolding sublist_at'_def
-  by (induction s t i rule: sublist_at.induct) auto
+  by (induction xs ys i rule: sublist_at.induct) auto
 
 text\<open>However, the new definition has some reasonable properties:\<close>
 subsubsection\<open>Properties\<close>
-lemma sublist_lengths: "sublist_at s t i \<Longrightarrow> i + length s \<le> length t"
-  by (induction s t i rule: sublist_at.induct) auto
+lemma sublist_lengths: "sublist_at xs ys i \<Longrightarrow> i + length xs \<le> length ys"
+  by (induction xs ys i rule: sublist_at.induct) auto
 
-lemma Nil_is_sublist: "sublist_at ([] :: 'y list) t i \<longleftrightarrow> i \<le> length t"
-  by (induction "[] :: 'y list" t i rule: sublist_at.induct) auto
+lemma Nil_is_sublist: "sublist_at ([] :: 'x list) ys i \<longleftrightarrow> i \<le> length ys"
+  by (induction "[] :: 'x list" ys i rule: sublist_at.induct) auto
 
 text\<open>Furthermore, we need:\<close>
-lemma sublist_step:
-  "\<lbrakk>i + length s < length t; sublist_at s t i; t!(i+length s) = x\<rbrakk> \<Longrightarrow> sublist_at (s@[x]) t i"
-  apply (induction s t i rule: sublist_at.induct)
+lemma sublist_step[intro]:
+  "\<lbrakk>i + length xs < length ys; sublist_at xs ys i; ys!(i + length xs) = x\<rbrakk> \<Longrightarrow> sublist_at (xs@[x]) ys i"
+  apply (induction xs ys i rule: sublist_at.induct)
   apply auto
   using sublist_at.elims(3) by fastforce
 
 lemma all_positions_sublist:
-"\<lbrakk>i + length s \<le> length t; \<forall>jj<length s. t!(i+jj) = s!jj\<rbrakk> \<Longrightarrow> sublist_at s t i"
-proof (induction s rule: rev_induct)
+"\<lbrakk>i + length xs \<le> length ys; \<forall>jj<length xs. ys!(i+jj) = xs!jj\<rbrakk> \<Longrightarrow> sublist_at xs ys i"
+proof (induction xs rule: rev_induct)
   case Nil
   then show ?case by (simp add: Nil_is_sublist)
 next
   case (snoc x xs)
-  from \<open>i + length (xs @ [x]) \<le> length t\<close> have "i + length xs \<le> length t" by simp
-  moreover have "\<forall>jj<length xs. t ! (i + jj) = xs ! jj"
+  from \<open>i + length (xs @ [x]) \<le> length ys\<close> have "i + length xs \<le> length ys" by simp
+  moreover have "\<forall>jj<length xs. ys!(i + jj) = xs!jj"
     by (simp add: nth_append snoc.prems(2))
-  ultimately have "sublist_at xs t i"
+  ultimately have "sublist_at xs ys i"
     using snoc.IH by simp
   then show ?case
-    using snoc.prems by (auto intro: sublist_step)
+    using snoc.prems by auto
 qed
 
-lemma sublist_all_positions: "sublist_at s t i \<Longrightarrow> \<forall>jj<length s. t!(i+jj) = s!jj"
-  by (induction s t i rule: sublist_at.induct) (auto simp: nth_Cons')
+lemma sublist_all_positions: "sublist_at xs ys i \<Longrightarrow> \<forall>jj<length xs. ys!(i+jj) = xs!jj"
+  by (induction xs ys i rule: sublist_at.induct) (auto simp: nth_Cons')
 
 text\<open>It also connects well to theory @{theory Sublist} (compare @{thm[source] sublist_def}):\<close>
 lemma sublist_at_altdef:
@@ -97,11 +97,12 @@ proof (induction xs ys i rule: sublist_at.induct)
   qed
 qed auto
 
-corollary sublist_iff_sublist_at: "Sublist.sublist s t \<longleftrightarrow> (\<exists>i. sublist_at s t i)"
+corollary sublist_iff_sublist_at: "Sublist.sublist xs ys \<longleftrightarrow> (\<exists>i. sublist_at xs ys i)"
   by (simp add: sublist_at_altdef Sublist.sublist_def)
 
 subsection\<open>Sublist-check algorithms\<close>
 
+text\<open>@{term s} for "searchword" / "searchlist", @{term t} for "text"\<close>
 definition "kmp_SPEC s t = SPEC (\<lambda>
   None \<Rightarrow> \<nexists>i. sublist_at s t i |
   Some i \<Rightarrow> sublist_at s t i \<and> (\<forall>ii<i. \<not>sublist_at s t ii))"
@@ -115,7 +116,7 @@ lemma kmp_result: "kmp_SPEC s t =
   apply (auto intro: LeastI dest: not_less_Least split: option.splits)
   by (meson LeastI nat_neq_iff not_less_Least)
 
-corollary weak_kmp_SPEC: "kmp_SPEC s t \<le> SPEC (\<lambda>p. p\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
+corollary weak_kmp_SPEC: "kmp_SPEC s t \<le> SPEC (\<lambda>pos. pos\<noteq>None \<longleftrightarrow> Sublist.sublist s t)"
   by (simp add: kmp_result)
 
 lemmas kmp_SPEC_altdefs =
@@ -123,67 +124,34 @@ lemmas kmp_SPEC_altdefs =
   kmp_SPEC_def[folded sublist_iff_sublist_at]
   kmp_result
 
-section\<open>Naive algorithm\<close>(*remove section? rename nap \<rightarrow> na / naive_algorithm?*)
+section\<open>Naive algorithm\<close>
 
 text\<open>Since KMP is a direct advancement of the naive "test-all-starting-positions" approach, we provide it here for comparison:\<close>
-subsection\<open>Basic form\<close>
-definition "I_out_na s t \<equiv> \<lambda>(i,j,found).
-  \<not>found \<and> j = 0 \<and> (\<forall>ii<i. \<not>sublist_at s t ii)
-  \<or> found \<and> sublist_at s t i"
-definition "I_in_na s t i \<equiv> \<lambda>(j,found).
-  (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> (if found then j = length s else j < length s)"
 
-definition "na s t \<equiv> do {
-  let i=0;
-  let j=0;
-  let found=False;
-  (_,_,found) \<leftarrow> WHILEIT (I_out_na s t) (\<lambda>(i,j,found). i \<le> length t - length s \<and> \<not>found) (\<lambda>(i,j,found). do {
-    (j,found) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,found). t!(i+j) = s!j \<and> \<not>found) (\<lambda>(j,found). do {
-      let j=j+1;
-      if j=length s then RETURN (j,True) else RETURN (j,False)
-    }) (j,found);
-    if \<not>found then do {
-      let i = i + 1;
-      let j = 0;
-      RETURN (i,j,False)
-    } else RETURN (i,j,True)
-  }) (i,j,found);
-
-  RETURN found
-}"
-
-lemma na_correct: "\<lbrakk>s \<noteq> []; length s \<le> length t\<rbrakk>
-  \<Longrightarrow> na s t \<le> SPEC (\<lambda>r. r \<longleftrightarrow> (\<exists>i. sublist_at s t i))"
-  unfolding na_def I_out_na_def I_in_na_def
-  apply (refine_vcg 
-        WHILEIT_rule[where R="measure (\<lambda>(i,_,found). (length t - i) + (if found then 0 else 1))"]
-        WHILEIT_rule[where R="measure (\<lambda>(j,_::bool). length s - j)"]
-        ) 
-  apply (vc_solve solve: asm_rl)
-  subgoal using less_SucE by blast
-  subgoal using less_SucE by blast
-  subgoal by (metis less_SucE sublist_all_positions)
-  subgoal by (simp add: all_positions_sublist)
-  subgoal by (meson le_diff_conv2 leI order_trans sublist_lengths)
-  done
-
-text\<open>The first precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition will access out-of-bound memory. Note however, that @{thm (prem 2) na_correct [no_vars]} is not needed if we use @{type int} or rewrite @{prop \<open>i \<le> length t - length s\<close>} in the first while-condition to @{prop \<open>i + length s \<le> length t\<close>}, which we'll do from now on.\<close>
-
-subsection\<open>A variant returning the position\<close>
-definition "I_out_nap s t \<equiv> \<lambda>(i,j,pos).
+subsection\<open>Invariants\<close>
+definition "I_out_na s t \<equiv> \<lambda>(i,j,pos).
   (\<forall>ii<i. \<not>sublist_at s t ii) \<and>
   (case pos of None \<Rightarrow> j = 0
     | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
-definition "I_in_nap s t i \<equiv> \<lambda>(j,pos).
+definition "I_in_na s t i \<equiv> \<lambda>(j,pos).
   case pos of None \<Rightarrow> j < length s \<and> (\<forall>jj<j. t!(i+jj) = s!(jj))
     | Some p \<Rightarrow> sublist_at s t i"
 
-definition "nap s t \<equiv> do {
+subsection\<open>Algorithm\<close>
+
+(*Algorithm is common knowledge \<longrightarrow> remove citation here?*)
+text\<open>The following definition is taken from Helmut Seidl's lecture on algorithms and data structures@{cite GAD} except that we
+\<^item> output the identified position @{term \<open>pos :: nat option\<close>} instead of just @{const True}
+\<^item> use @{term \<open>pos :: nat option\<close>} as break-flag to support the abort within the loops
+\<^item> rewrite @{prop \<open>i \<le> length t - length s\<close>} in the first while-condition to @{prop \<open>i + length s \<le> length t\<close>} to avoid having to use @{type int} for list indexes (or the additional precondition @{prop \<open>length s \<le> length t\<close>})
+\<close>
+
+definition "naive_algorithm s t \<equiv> do {
   let i=0;
   let j=0;
   let pos=None;
-  (_,_,pos) \<leftarrow> WHILEIT (I_out_nap s t) (\<lambda>(i,_,pos). i + length s \<le>length t \<and> pos=None) (\<lambda>(i,j,pos). do {
-    (_,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
+  (_,_,pos) \<leftarrow> WHILEIT (I_out_na s t) (\<lambda>(i,_,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
+    (_,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,_). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -197,9 +165,12 @@ definition "nap s t \<equiv> do {
   RETURN pos
 }"
 
-lemma "s \<noteq> []
-  \<Longrightarrow> nap s t \<le> kmp_SPEC s t"
-  unfolding nap_def kmp_SPEC_def I_out_nap_def I_in_nap_def
+subsection\<open>Correctness\<close>
+
+text\<open>The basic lemmas on @{const sublist_at} from the previous chapter together with @{theory Refine_Monadic}'s verification condition generator / solver suffice:\<close>
+
+lemma "s \<noteq> [] \<Longrightarrow> naive_algorithm s t \<le> kmp_SPEC s t"
+  unfolding naive_algorithm_def kmp_SPEC_def I_out_na_def I_in_na_def
   apply (refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
@@ -210,6 +181,8 @@ lemma "s \<noteq> []
   subgoal by (metis less_SucE sublist_all_positions)
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
+
+text\<open>Note that the precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition accesses out-of-bound memory. This will apply to KMP, too.\<close>
 
 section\<open>Borders of lists\<close>
 
@@ -356,7 +329,7 @@ definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
   (\<forall>ii<i. \<not>sublist_at s t ii) \<and>
   (case pos of None \<Rightarrow> (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> j < length s
     | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
-text\<open>For the inner loop, we can reuse @{const I_in_nap}.\<close>
+text\<open>For the inner loop, we can reuse @{const I_in_na}.\<close>
 
 subsection\<open>Algorithm\<close>
 text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
@@ -367,7 +340,7 @@ definition "kmp s t \<equiv> do {
   let pos=None;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t);
-    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -500,7 +473,7 @@ qed
 
 lemma kmp_correct: "s \<noteq> []
   \<Longrightarrow> kmp s t \<le> kmp_SPEC s t"
-  unfolding kmp_def kmp_SPEC_def I_outer_def I_in_nap_def
+  unfolding kmp_def kmp_SPEC_def I_outer_def I_in_na_def
   apply (refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
@@ -525,7 +498,7 @@ definition "kmp1 s t \<equiv> do {
   borders \<leftarrow> computeBordersSpec (butlast s);(*At the last char, we abort instead.*)
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t);
-    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -630,7 +603,7 @@ lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) 
   by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE iblp1.elims intrinsic_border_max length_take min.absorb2)
 
 text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
-subsubsection\<open>Computing @{const iblp1}\<close>
+subsection\<open>Computing @{const iblp1}\<close>
 
 theorem skipping_ok:
   assumes j_bounds[simp]: "1 < j" "j \<le> length s"
@@ -841,7 +814,7 @@ definition "kmp2 s t \<equiv> do {
   borders \<leftarrow> computeBorders2 s;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t \<and> pos=None);
-    (j,pos) \<leftarrow> WHILEIT (I_in_nap s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
+    (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
       let j=j+1;
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
@@ -904,16 +877,16 @@ sepref_register computeBorders
 
 lemma kmp_inner_in_bound:
   assumes "i + length s \<le> length t"
-  assumes "I_in_nap s t i (j,None)"
+  assumes "I_in_na s t i (j,None)"
   shows "i + j < length t" "j < length s"
   using assms
-  by (auto simp: I_in_nap_def)
+  by (auto simp: I_in_na_def)
   
 sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^sub>a (arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a option_assn nat_assn"
   unfolding kmp3_def kmp2_def
   apply (simp only: max_0L) \<comment>\<open>Avoid the unneeded @{const max}\<close>
-  apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" conj_commute)
-  apply (rewrite in "WHILEIT (I_in_nap _ _ _) \<hole>" short_circuit_conv)
+  apply (rewrite in "WHILEIT (I_in_na _ _ _) \<hole>" conj_commute)
+  apply (rewrite in "WHILEIT (I_in_na _ _ _) \<hole>" short_circuit_conv)
   supply kmp_inner_in_bound[dest]
   supply option.splits[split]
   supply eq_id_param[where 'a='a, sepref_import_param]
