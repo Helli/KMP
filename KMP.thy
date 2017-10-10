@@ -197,7 +197,7 @@ interpretation border_order: order border strict_border
 interpretation border_bot: order_bot Nil border strict_border
   by standard (simp add: border_def)
 
-lemma borderE[elim](*rm?*):
+lemma borderE[elim]:
   fixes xs ys :: "'a list"
   assumes "border xs ys"
   obtains "prefix xs ys" and "suffix xs ys"
@@ -540,8 +540,8 @@ proof -
     by (metis append_eq_conv_conj prefixE)
 qed
 
-lemma ib1[simp]: "intrinsic_border [z] = []"
-  by (metis intrinsic_border_less length_Cons length_ge_1_conv less_Suc0 list.distinct(1) list.size(3))
+lemma ib_singleton[simp]: "intrinsic_border [z] = []"
+  by (metis intrinsic_border_less length_Cons length_greater_0_conv less_Suc0 list.size(3))
 
 lemma border_butlast: "border xs ys \<Longrightarrow> border (butlast xs) (butlast ys)"
   apply (auto simp: border_def)
