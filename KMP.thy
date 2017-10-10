@@ -855,7 +855,6 @@ definition "kmp3 s t \<equiv> do {
 lemma kmp3_correct: "kmp3 s t \<le> kmp_SPEC s t"
   unfolding kmp3_def by (simp add: kmp2_correct) (simp add: kmp_SPEC_def)
 
-(*Todo: Algorithm for the set of all positions. Then: No break-flag needed, and no case distinction in the specification.*)
 section \<open>Refinement to Imperative/HOL\<close>
 
 lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by simp
