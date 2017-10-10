@@ -661,7 +661,7 @@ proof (rule ccontr)
   next
     case skipped
     let ?border = "take (i-1) s"
-      \<comment>\<open>This could not be extended to a border of @{term \<open>take j s\<close>} due to the mismatch.\<close>
+      \<comment>\<open>This border of @{term \<open>take (j-1) s\<close>} could not be extended to a border of @{term \<open>take j s\<close>} due to the mismatch.\<close>
     let ?impossible = "take (iblp1 s j - 2) s"
       \<comment>\<open>A strict border longer than @{term \<open>intrinsic_border ?border\<close>}, a contradiction.\<close>
     have "length (take j s) = j"
