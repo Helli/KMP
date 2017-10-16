@@ -35,7 +35,7 @@ fun sublist_at :: "'a list \<Rightarrow> 'a list \<Rightarrow> nat \<Rightarrow>
   "sublist_at [] ys 0 \<longleftrightarrow> True" |
   "sublist_at _ [] _ \<longleftrightarrow> False"
 
-text\<open>For all relevant cases, both definitions agree:\<close>
+text\<open>In the relevant cases, both definitions agree:\<close>
 lemma "i \<le> length ys \<Longrightarrow> sublist_at xs ys i \<longleftrightarrow> sublist_at' xs ys i"
   unfolding sublist_at'_def
   by (induction xs ys i rule: sublist_at.induct) auto
