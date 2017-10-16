@@ -486,15 +486,15 @@ lemma kmp_correct: "s \<noteq> []
   done
 
 text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
-definition computeBordersSpec :: "'a list \<Rightarrow> nat list nres" where
-  "computeBordersSpec s \<equiv> SPEC (\<lambda>l. length l = length s + 1 \<and> (\<forall>j\<le>length s. l!j = iblp1 s j))"
+definition compute_iblp1s_SPEC :: "'a list \<Rightarrow> nat list nres" where
+  "compute_iblp1s_SPEC s \<equiv> SPEC (\<lambda>ls. length ls = length s + 1 \<and> (\<forall>j\<le>length s. ls!j = iblp1 s j))"
 
 definition "kmp1 s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
   let j=0;
   let pos=None;
-  borders \<leftarrow> computeBordersSpec (butlast s);(*At the last char, we abort instead.*)
+  ls \<leftarrow> compute_iblp1s_SPEC (butlast s);(*At the last char, we abort instead.*)
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -502,9 +502,9 @@ definition "kmp1 s t \<equiv> do {
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
     if pos=None then do {
-      ASSERT (j < length borders);
-      let i = i + (j - borders!j + 1);
-      let j = max 0 (borders!j - 1); (*max not necessary*)
+      ASSERT (j < length ls);
+      let i = i + (j - ls!j + 1);
+      let j = max 0 (ls!j - 1); (*max not necessary*)
       RETURN (i,j,None)
     } else RETURN (i,j,Some i)
   }) (i,j,pos);
@@ -518,7 +518,7 @@ lemma iblp1_butlast[simp]: "j < length s \<Longrightarrow> iblp1 (butlast s) j =
 lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply (rule refine_IdD)
   unfolding kmp1_def kmp_def
-  unfolding Let_def computeBordersSpec_def nres_monad_laws
+  unfolding Let_def compute_iblp1s_SPEC_def nres_monad_laws
   apply (intro ASSERT_refine_right ASSERT_refine_left)
   apply simp
   apply (rule Refine_Basic.intro_spec_refine)
@@ -601,7 +601,7 @@ corollary strict_border_take_iblp1: "0 < i \<Longrightarrow> i \<le> length s \<
 lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
   by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE iblp1.elims intrinsic_border_max length_take min.absorb2)
 
-text\<open>Next, an algorithm that satisfies @{const computeBordersSpec}:\<close>
+text\<open>Next, an algorithm that satisfies @{const compute_iblp1s_SPEC}:\<close>
 subsection\<open>Computing @{const iblp1}\<close>
 
 theorem skipping_ok:
@@ -700,10 +700,10 @@ proof -
     using le_antisym by presburger
 qed
 
-definition "I_out_cb s \<equiv> \<lambda>(b,i,j).
-  length s + 1 = length b \<and>
-  (\<forall>jj<j. b!jj = iblp1 s jj) \<and>
-  b!(j-1) = i \<and>
+definition "I_out_cb s \<equiv> \<lambda>(ls,i,j).
+  length s + 1 = length ls \<and>
+  (\<forall>jj<j. ls!jj = iblp1 s jj) \<and>
+  ls!(j-1) = i \<and>
   0 < j"
 definition "I_in_cb s j \<equiv> \<lambda>i.
   if j=1 then i=0 (* first iteration *)
@@ -711,31 +711,31 @@ definition "I_in_cb s j \<equiv> \<lambda>i.
     strict_border (take (i-1) s) (take (j-1) s) \<and>
     iblp1 s j \<le> i + 1"
 
-definition computeBorders :: "'a list \<Rightarrow> nat list nres" where
-  "computeBorders s = do {
-  let b=replicate (length s + 1) 0;(*only the first 0 is needed*)
+definition compute_iblp1s :: "'a list \<Rightarrow> nat list nres" where
+  "compute_iblp1s s = do {
+  let ls=replicate (length s + 1) 0;(*only the first 0 is needed*)
   let i=0;
   let j=1;
-  (b,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
+  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(ls,i,j). j < length ls) (\<lambda>(ls,i,j). do {
     i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length b);
-      let i=b!(i-1);
+      ASSERT (i-1 < length ls);
+      let i=ls!(i-1);
       RETURN i
     }) i;
     let i=i+1;
-    ASSERT (j < length b);
-    let b=b[j:=i];
+    ASSERT (j < length ls);
+    let ls=ls[j:=i];
     let j=j+1;
-    RETURN (b,i,j)
-  }) (b,i,j);
+    RETURN (ls,i,j)
+  }) (ls,i,j);
   
-  RETURN b
+  RETURN ls
 }"
 
-lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
-  unfolding computeBordersSpec_def computeBorders_def I_out_cb_def I_in_cb_def
+lemma computeBorders_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
+  unfolding compute_iblp1s_SPEC_def compute_iblp1s_def I_out_cb_def I_in_cb_def
   apply (simp, refine_vcg
-    WHILEIT_rule[where R="measure (\<lambda>(b,i,j). length s + 1 - j)"]
+    WHILEIT_rule[where R="measure (\<lambda>(ls,i,j). length s + 1 - j)"]
     WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
                       apply (vc_solve, fold One_nat_def)
@@ -752,40 +752,40 @@ lemma computeBorders_correct: "computeBorders s \<le> computeBordersSpec s"
   subgoal by linarith
   done
 
-text\<open>To avoid inefficiencies, we refine @{const computeBorders} to take @{term s}
+text\<open>To avoid inefficiencies, we refine @{const compute_iblp1s} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
 definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
   "computeBorders2 s = do {
-  let b=replicate (length s) 0;
+  let ls=replicate (length s) 0;
   let i=0;
   let j=1;
-  (b,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(b,i,j). do {
-    ASSERT (j < length b);
+  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(ls,i,j). do {
+    ASSERT (j < length ls);
     i \<leftarrow> WHILEIT (I_in_cb (butlast s) j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length b);
-      let i=b!(i-1);
+      ASSERT (i-1 < length ls);
+      let i=ls!(i-1);
       RETURN i
     }) i;
     let i=i+1;
-    ASSERT (j < length b);
-    let b=b[j:=i];
+    ASSERT (j < length ls);
+    let ls=ls[j:=i];
     let j=j+1;
-    RETURN (b,i,j)
-  }) (b,i,j);
+    RETURN (ls,i,j)
+  }) (ls,i,j);
   
-  RETURN b
+  RETURN ls
 }"
 
 lemma computeBorders_inner_bounds: 
-  assumes "I_out_cb s (b,ix,j)"
-  assumes "j < length b"
+  assumes "I_out_cb s (ls,ix,j)"
+  assumes "j < length ls"
   assumes "I_in_cb s j i"
   shows "i-1 < length s" "j-1 < length s"
   using assms
     by (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
 
-lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> computeBorders2 s \<le> \<Down>Id (computeBorders s')"
-  unfolding computeBorders2_def computeBorders_def
+lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> computeBorders2 s \<le> \<Down>Id (compute_iblp1s s')"
+  unfolding computeBorders2_def compute_iblp1s_def
   apply (refine_rcg)
   apply (refine_dref_type)
   apply (vc_solve simp: in_br_conv)
@@ -796,7 +796,7 @@ lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longright
   
 corollary computeBorders2_refine'[refine]: 
   assumes "(s,s') \<in> br butlast (op \<noteq>[])"
-  shows "computeBorders2 s \<le> \<Down> Id (computeBordersSpec s')"
+  shows "computeBorders2 s \<le> \<Down> Id (compute_iblp1s_SPEC s')"
 proof -
   note computeBorders2_ref1
   also note computeBorders_correct
@@ -804,13 +804,13 @@ proof -
 qed
   
 subsection\<open>Final refinement\<close>
-text\<open>We replace @{const computeBordersSpec} with @{const computeBorders}\<close>
+text\<open>We replace @{const compute_iblp1s_SPEC} with @{const compute_iblp1s}\<close>
 definition "kmp2 s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
   let j=0;
   let pos=None;
-  borders \<leftarrow> computeBorders2 s;
+  ls \<leftarrow> computeBorders2 s;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t \<and> pos=None);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -818,9 +818,9 @@ definition "kmp2 s t \<equiv> do {
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
     if pos=None then do {
-      ASSERT (j < length borders);
-      let i = i + (j - borders!j + 1);
-      let j = max 0 (borders!j - 1); (*max not necessary*)
+      ASSERT (j < length ls);
+      let i = i + (j - ls!j + 1);
+      let j = max 0 (ls!j - 1); (*max not necessary*)
       RETURN (i,j,None)
     } else RETURN (i,j,Some i)
   }) (i,j,pos);
@@ -871,7 +871,7 @@ sepref_definition computeBorders2_impl is computeBorders2 :: "(arl_assn id_assn)
   
 declare computeBorders2_impl.refine[sepref_fr_rules]
 
-sepref_register computeBorders
+sepref_register compute_iblp1s
 
 lemma kmp_inner_in_bound:
   assumes "i + length s \<le> length t"
