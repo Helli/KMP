@@ -1,8 +1,9 @@
-session "KMP" = "Sepref_IICF" +
-  options [document = pdf, document_output = "output"]
-  theories [document = false]
+chapter AFP
+
+session Knuth_Morris_Pratt (AFP) = Sepref_IICF +
+  options [timeout = 600]
   theories
-	KMP
+    KMP
   document_files
-    "root.tex"
-    "root.bib"
+    root.tex
+    root.bib
