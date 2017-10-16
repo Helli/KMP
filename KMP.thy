@@ -1,3 +1,4 @@
+
 theory KMP
   imports Refine_Imperative_HOL.IICF
     "HOL-Library.Sublist"
@@ -183,13 +184,14 @@ lemma "s \<noteq> [] \<Longrightarrow> naive_algorithm s t \<le> kmp_SPEC s t"
 
 text\<open>Note that the precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition accesses out-of-bound memory. This will apply to KMP, too.\<close>
 
-section\<open>Borders of lists\<close>
+section\<open>Knuth–Morris–Pratt algorithm\<close>
+subsection\<open>Borders of lists\<close>
 
 definition "border xs ys \<longleftrightarrow> prefix xs ys \<and> suffix xs ys"
 definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> length xs < length ys"
 definition "intrinsic_border ls \<equiv> ARG_MAX length b. strict_border b ls"
 
-subsection\<open>Properties\<close>
+subsubsection\<open>Properties\<close>
 
 interpretation border_order: order border strict_border
   by standard (auto simp: border_def suffix_def strict_border_def)
@@ -272,7 +274,7 @@ lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_
 lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
   by (metis intrinsic_border_less length_take less_not_refl2 min_less_iff_conj take_eq_Nil)
 
-subsection\<open>Examples\<close>
+subsubsection\<open>Examples\<close>
 
 lemma border_example: "{b. border b ''aabaabaa''} = {'''', ''a'', ''aa'', ''aabaa'', ''aabaabaa''}"
   (is "{b. border b ?l} = {?take0, ?take1, ?take2, ?take5, ?l}")
@@ -315,7 +317,7 @@ proof - \<comment>\<open>We later obtain a fast algorithm for that.\<close>
     by simp (metis list.discI nonempty_is_arg_max_ib)
 qed
 
-section\<open>Knuth–Morris–Pratt algorithm\<close>
+subsection\<open>Main routine\<close>
 
 text\<open>"Intrinsic border length plus one" for prefixes\<close>
 fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
@@ -323,14 +325,14 @@ fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
   "iblp1 s j = length (intrinsic_border (take j s)) + 1"
   --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
 
-subsection\<open>Invariants\<close>
+subsubsection\<open>Invariants\<close>
 definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
   (\<forall>ii<i. \<not>sublist_at s t ii) \<and>
   (case pos of None \<Rightarrow> (\<forall>jj<j. t!(i+jj) = s!(jj)) \<and> j < length s
     | Some p \<Rightarrow> p=i \<and> sublist_at s t i)"
 text\<open>For the inner loop, we can reuse @{const I_in_na}.\<close>
 
-subsection\<open>Algorithm\<close>
+subsubsection\<open>Algorithm\<close>
 text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
 definition "kmp s t \<equiv> do {
   ASSERT (s \<noteq> []);
@@ -354,6 +356,7 @@ definition "kmp s t \<equiv> do {
   RETURN pos
 }"
 
+subsubsection\<open>Correctness\<close>
 lemma iblp1_j0[simp]: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
   by (cases j) simp_all
 
@@ -485,6 +488,7 @@ lemma kmp_correct: "s \<noteq> []
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
 
+subsubsection\<open>Storing the @{const iblp1}-values\<close>
 text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
 definition compute_iblp1s_SPEC :: "'a list \<Rightarrow> nat list nres" where
   "compute_iblp1s_SPEC s \<equiv> SPEC (\<lambda>ls. length ls = length s + 1 \<and> (\<forall>j\<le>length s. ls!j = iblp1 s j))"
@@ -527,6 +531,44 @@ lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply vc_solve
   done
 
+text\<open>Next, an algorithm that satisfies @{const compute_iblp1s_SPEC}:\<close>
+subsection\<open>Computing @{const iblp1}\<close>
+subsubsection\<open>Invariants\<close>
+
+definition "I_out_cb s \<equiv> \<lambda>(ls,i,j).
+  length s + 1 = length ls \<and>
+  (\<forall>jj<j. ls!jj = iblp1 s jj) \<and>
+  ls!(j-1) = i \<and>
+  0 < j"
+definition "I_in_cb s j \<equiv> \<lambda>i.
+  if j=1 then i=0 (* first iteration *)
+  else
+    strict_border (take (i-1) s) (take (j-1) s) \<and>
+    iblp1 s j \<le> i + 1"
+
+subsubsection\<open>Algorithm\<close>
+definition compute_iblp1s :: "'a list \<Rightarrow> nat list nres" where
+  "compute_iblp1s s = do {
+  let ls=replicate (length s + 1) 0;(*only the first 0 is needed*)
+  let i=0;
+  let j=1;
+  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(ls,i,j). j < length ls) (\<lambda>(ls,i,j). do {
+    i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
+      ASSERT (i-1 < length ls);
+      let i=ls!(i-1);
+      RETURN i
+    }) i;
+    let i=i+1;
+    ASSERT (j < length ls);
+    let ls=ls[j:=i];
+    let j=j+1;
+    RETURN (ls,i,j)
+  }) (ls,i,j);
+  
+  RETURN ls
+}"
+
+subsubsection\<open>Correctness\<close>
 lemma take_length_ib[simp]:
   assumes "0 < j" "j \<le> length s"
     shows "take (length (intrinsic_border (take j s))) s = intrinsic_border (take j s)"
@@ -600,9 +642,6 @@ corollary strict_border_take_iblp1: "0 < i \<Longrightarrow> i \<le> length s \<
 
 lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
   by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE iblp1.elims intrinsic_border_max length_take min.absorb2)
-
-text\<open>Next, an algorithm that satisfies @{const compute_iblp1s_SPEC}:\<close>
-subsection\<open>Computing @{const iblp1}\<close>
 
 theorem skipping_ok:
   assumes j_bounds[simp]: "1 < j" "j \<le> length s"
@@ -700,38 +739,6 @@ proof -
     using le_antisym by presburger
 qed
 
-definition "I_out_cb s \<equiv> \<lambda>(ls,i,j).
-  length s + 1 = length ls \<and>
-  (\<forall>jj<j. ls!jj = iblp1 s jj) \<and>
-  ls!(j-1) = i \<and>
-  0 < j"
-definition "I_in_cb s j \<equiv> \<lambda>i.
-  if j=1 then i=0 (* first iteration *)
-  else
-    strict_border (take (i-1) s) (take (j-1) s) \<and>
-    iblp1 s j \<le> i + 1"
-
-definition compute_iblp1s :: "'a list \<Rightarrow> nat list nres" where
-  "compute_iblp1s s = do {
-  let ls=replicate (length s + 1) 0;(*only the first 0 is needed*)
-  let i=0;
-  let j=1;
-  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(ls,i,j). j < length ls) (\<lambda>(ls,i,j). do {
-    i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length ls);
-      let i=ls!(i-1);
-      RETURN i
-    }) i;
-    let i=i+1;
-    ASSERT (j < length ls);
-    let ls=ls[j:=i];
-    let j=j+1;
-    RETURN (ls,i,j)
-  }) (ls,i,j);
-  
-  RETURN ls
-}"
-
 lemma computeBorders_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
   unfolding compute_iblp1s_SPEC_def compute_iblp1s_def I_out_cb_def I_in_cb_def
   apply (simp, refine_vcg
@@ -752,6 +759,7 @@ lemma computeBorders_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
   subgoal by linarith
   done
 
+subsubsection\<open>Index shift\<close>
 text\<open>To avoid inefficiencies, we refine @{const compute_iblp1s} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
 definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
@@ -803,7 +811,7 @@ proof -
   finally show ?thesis using assms by simp
 qed
   
-subsection\<open>Final refinement\<close>
+subsection\<open>Conflation\<close>
 text\<open>We replace @{const compute_iblp1s_SPEC} with @{const compute_iblp1s}\<close>
 definition "kmp2 s t \<equiv> do {
   ASSERT (s \<noteq> []);
@@ -847,6 +855,7 @@ proof -
   finally show ?thesis.
 qed
 
+text\<open>For convenience, we also remove the precondition:\<close>
 definition "kmp3 s t \<equiv> do {
   if s=[] then RETURN (Some 0) else kmp2 s t
 }"
