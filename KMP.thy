@@ -9,10 +9,6 @@ text\<open>Test. @{cite "Refine_Imperative_HOL-AFP"} Working? Test 2 @{cite FPMI
 
 declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
 no_notation Ref.update ("_ := _" 62)
-lemma nat_min_absorb_Suc[simp]: (*rm?*)
-  "a < Suc b \<Longrightarrow> min a b = a"
-  "b < Suc a \<Longrightarrow> min a b = b"
-  by simp_all
 
 section\<open>Specification\<close>
 
