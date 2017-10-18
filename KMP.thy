@@ -5,7 +5,7 @@ theory KMP
     "HOL-Library.Code_Char"
 begin
 
-text\<open>Test. @{cite "Refine_Imperative_HOL-AFP"} Working? Test 2 @{cite FPMIS} @{cite GAD}\<close>
+text\<open>Test. @{cite "Refine_Imperative_HOL-AFP"} Working? Test 2 @{cite KMP77} @{cite GAD}\<close>
 
 declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
 no_notation Ref.update ("_ := _" 62)
@@ -98,6 +98,7 @@ corollary sublist_iff_sublist_at: "Sublist.sublist xs ys \<longleftrightarrow> (
 
 subsection\<open>Sublist-check algorithms\<close>
 
+text\<open>We use Lammich's @{theory Refine_Monadic} for the specification, as well as the algorithm later.\<close>
 text\<open>@{term s} for "searchword" / "searchlist", @{term t} for "text"\<close>
 definition "kmp_SPEC s t = SPEC (\<lambda>
   None \<Rightarrow> \<nexists>i. sublist_at s t i |
@@ -135,7 +136,7 @@ definition "I_in_na s t i \<equiv> \<lambda>(j,pos).
 
 subsection\<open>Algorithm\<close>
 
-(*Algorithm is common knowledge \<longrightarrow> remove citation here?*)
+(*Algorithm is common knowledge \<longrightarrow> remove citation here, move explanations to KMP below?*)
 text\<open>The following definition is taken from Helmut Seidl's lecture on algorithms and data structures@{cite GAD} except that we
 \<^item> output the identified position @{term \<open>pos :: nat option\<close>} instead of just @{const True}
 \<^item> use @{term \<open>pos :: nat option\<close>} as break-flag to support the abort within the loops
@@ -543,6 +544,11 @@ definition "I_in_cb s j \<equiv> \<lambda>i.
     iblp1 s j \<le> i + 1"
 
 subsubsection\<open>Algorithm\<close>
+
+text\<open>Again, we follow Seidl@{cite GAD}, p.582. Apart from the +1-shift, we make another modification:
+Instead of directly setting @{term \<open>ls!1\<close>}, we let the first loop-iteration (if there is one) do that for us.
+This allows us to remove the precondition @{prop \<open>s \<noteq> []\<close>}, as the index bounds are respected even in that special case.\<close>
+
 definition compute_iblp1s :: "'a list \<Rightarrow> nat list nres" where
   "compute_iblp1s s = do {
   let ls=replicate (length s + 1) 0;(*only the first 0 is needed*)
