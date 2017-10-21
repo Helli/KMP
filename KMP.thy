@@ -316,11 +316,13 @@ qed
 
 subsection\<open>Main routine\<close>
 
-text\<open>"Intrinsic border length plus one" for prefixes\<close>
-fun iblp1 :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
-  "iblp1 s 0 = 0" \<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
-  "iblp1 s j = length (intrinsic_border (take j s)) + 1"
-  --\<open>Todo: Better name, use @{command definition} and @{const If} instead of fake pattern matching, then prove @{attribute simp} rules\<close>
+text\<open>The following is Seidl's "border" table@{cite GAD} (values shifted by 1 so we don't need @type int)},
+or equivalently, "f" from Knuth's, Morris' and Pratt's paper@{cite KMP} (with indexes starting at 0)\<close>
+fun \<ff> :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
+  "\<ff> s 0 = 0" \<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
+  "\<ff> s j = length (intrinsic_border (take j s)) + 1"
+  --\<open>Todo: Use @{command abbreviation} and @{const If}?\<close>
+text\<open>Note that we use their "next" only implicitly.\<close>
 
 subsubsection\<open>Invariants\<close>
 definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
@@ -330,7 +332,7 @@ definition "I_outer s t \<equiv> \<lambda>(i,j,pos).
 text\<open>For the inner loop, we can reuse @{const I_in_na}.\<close>
 
 subsubsection\<open>Algorithm\<close>
-text\<open>First, we use the non-evaluable function @{const iblp1} directly:\<close>
+text\<open>First, we use the non-evaluable function @{const \<ff>} directly:\<close>
 definition "kmp s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
@@ -344,8 +346,8 @@ definition "kmp s t \<equiv> do {
     }) (j,pos);
     if pos=None then do {
       ASSERT (j < length s);
-      let i = i + (j - iblp1 s j + 1);
-      let j = max 0 (iblp1 s j - 1); (*max not necessary*)
+      let i = i + (j - \<ff> s j + 1);
+      let j = max 0 (\<ff> s j - 1); (*max not necessary*)
       RETURN (i,j,None)
     } else RETURN (i,j,Some i)
   }) (i,j,pos);
@@ -354,50 +356,50 @@ definition "kmp s t \<equiv> do {
 }"
 
 subsubsection\<open>Correctness\<close>
-lemma iblp1_j0[simp]: "iblp1 s j = 0 \<longleftrightarrow> j = 0"
+lemma \<ff>_eq_0_iff_j_eq_0[simp]: "\<ff> s j = 0 \<longleftrightarrow> j = 0"
   by (cases j) simp_all
 
-lemma j_le_iblp1_le: "j \<le> length s \<Longrightarrow> iblp1 s j \<le> j"
+lemma j_le_\<ff>_le: "j \<le> length s \<Longrightarrow> \<ff> s j \<le> j"
   apply (cases j)
   apply simp_all
   by (metis Suc_leI intrinsic_border_less length_take list.size(3) min.absorb2 nat.simps(3) not_less)
 
-lemma j_le_iblp1_le': "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow> iblp1 s j - 1 < j"
-  by (metis diff_less j_le_iblp1_le le_eq_less_or_eq less_imp_diff_less less_one)
+lemma j_le_\<ff>_le': "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow> \<ff> s j - 1 < j"
+  by (metis diff_less j_le_\<ff>_le le_eq_less_or_eq less_imp_diff_less less_one)
 
-lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> iblp1 s j - 1 < length s"
+lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> \<ff> s j - 1 < length s"
   by (cases j) (simp_all add: intrinsic_border_less')
 
 lemma "p576 et seq":
   assumes
     "j \<le> length s" and
     assignments:
-    "i' = i + (j + 1 - iblp1 s j)"
-    "j' = max 0 (iblp1 s j - 1)"
+    "i' = i + (j + 1 - \<ff> s j)"
+    "j' = max 0 (\<ff> s j - 1)"
   shows
     sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed?*) and
     i_increase: "i' > i"
-  using assignments by (simp_all add: j_le_iblp1_le[OF assms(1), THEN le_imp_less_Suc])
+  using assignments by (simp_all add: j_le_\<ff>_le[OF assms(1), THEN le_imp_less_Suc])
 
 lemma reuse_matches: 
   assumes j_le: "j \<le> length s"
   and old_matches: "\<forall>jj<j. t ! (i + jj) = s ! jj"
-  shows "\<forall>jj<iblp1 s j - 1. t ! (i + (j - iblp1 s j + 1) + jj) = s ! jj"
+  shows "\<forall>jj<\<ff> s j - 1. t ! (i + (j - \<ff> s j + 1) + jj) = s ! jj"
     (is "\<forall>jj<?j'. t ! (?i' + jj) = s ! jj")
 proof (cases "j>0")
   assume "j>0"
-  have iblp1_le: "iblp1 s j \<le> j"
-    by (simp add: j_le j_le_iblp1_le)
-  with old_matches have 1: "\<forall>jj<?j'. t ! (?i' + jj) = s ! (j - iblp1 s j + 1 + jj)"
+  have \<ff>_le: "\<ff> s j \<le> j"
+    by (simp add: j_le j_le_\<ff>_le)
+  with old_matches have 1: "\<forall>jj<?j'. t ! (?i' + jj) = s ! (j - \<ff> s j + 1 + jj)"
     by (metis ab_semigroup_add_class.add.commute add.assoc diff_diff_cancel less_diff_conv)
   have [simp]: "length (take j s) = j" "length (intrinsic_border (take j s)) = ?j'"
-    by (simp add: j_le) (metis \<open>0 < j\<close> diff_add_inverse2 iblp1.elims nat_neq_iff)
-  then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - (iblp1 s j - 1) + jj)"
+    by (simp add: j_le) (metis \<open>0 < j\<close> diff_add_inverse2 \<ff>.elims nat_neq_iff)
+  then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - (\<ff> s j - 1) + jj)"
     by (metis "needed?" \<open>0 < j\<close> border_positions length_greater_0_conv strict_border_def)
-  then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - iblp1 s j + 1 + jj)"
-    by (simp add: iblp1_le)
-  then have 2: "\<forall>jj<?j'. s ! (j - iblp1 s j + 1 + jj) = s ! jj"
-    using iblp1_le by simp
+  then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - \<ff> s j + 1 + jj)"
+    by (simp add: \<ff>_le)
+  then have 2: "\<forall>jj<?j'. s ! (j - \<ff> s j + 1 + jj) = s ! jj"
+    using \<ff>_le by simp
   from 1 2 show ?thesis by simp
 qed simp
 
@@ -408,7 +410,7 @@ theorem shift_safe:
     [simp]: "j < length s" and
     matches: "\<forall>jj<j. t!(i+jj) = s!jj"
   defines
-    assignment: "i' \<equiv> i + (j - iblp1 s j + 1)"
+    assignment: "i' \<equiv> i + (j - \<ff> s j + 1)"
   shows
     "\<forall>ii<i'. \<not>sublist_at s t ii"
 proof (standard, standard)
@@ -433,13 +435,13 @@ proof (standard, standard)
       using \<open>ii < i'\<close> assignment by linarith
     then have less_j[simp]: "j + i - ii < j" and le_s: "j + i - ii \<le> length s"
       using \<open>ii < i'\<close> assms(3) skipped by linarith+
-    note iblp1_le[simp] = j_le_iblp1_le[OF assms(3)[THEN less_imp_le]]
-    have "0 < iblp1 s j"
-      using \<open>0 < j\<close> iblp1_j0 neq0_conv by blast
-    then have "j + i - ii > iblp1 s j - 1"
-      using \<open>ii < i'\<close> assignment iblp1_le by linarith
+    note \<ff>_le[simp] = j_le_\<ff>_le[OF assms(3)[THEN less_imp_le]]
+    have "0 < \<ff> s j"
+      using \<open>0 < j\<close> \<ff>_eq_0_iff_j_eq_0 neq0_conv by blast
+    then have "j + i - ii > \<ff> s j - 1"
+      using \<open>ii < i'\<close> assignment \<ff>_le by linarith
     then have contradiction_goal: "j + i - ii > length (intrinsic_border (take j s))"
-      by (metis (no_types, hide_lams) One_nat_def \<open>0 < j\<close> ab_semigroup_add_class.add.commute add.left_neutral add_Suc diff_Suc_Suc diff_zero gr0_implies_Suc iblp1.simps(2))
+      by (metis \<ff>.elims \<open>0 < j\<close> add_diff_cancel_right' not_gr_zero)
     show ?thesis
     proof
       assume "sublist_at s t ii"
@@ -485,17 +487,17 @@ lemma kmp_correct: "s \<noteq> []
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
 
-subsubsection\<open>Storing the @{const iblp1}-values\<close>
-text\<open>We refine the algorithm to compute the @{const iblp1}-values only once at the start:\<close>
-definition compute_iblp1s_SPEC :: "'a list \<Rightarrow> nat list nres" where
-  "compute_iblp1s_SPEC s \<equiv> SPEC (\<lambda>ls. length ls = length s + 1 \<and> (\<forall>j\<le>length s. ls!j = iblp1 s j))"
+subsubsection\<open>Storing the @{const \<ff>}-values\<close>
+text\<open>We refine the algorithm to compute the @{const \<ff>}-values only once at the start:\<close>
+definition compute_\<ff>s_SPEC :: "'a list \<Rightarrow> nat list nres" where
+  "compute_\<ff>s_SPEC s \<equiv> SPEC (\<lambda>\<ff>s. length \<ff>s = length s + 1 \<and> (\<forall>j\<le>length s. \<ff>s!j = \<ff> s j))"
 
 definition "kmp1 s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
   let j=0;
   let pos=None;
-  ls \<leftarrow> compute_iblp1s_SPEC (butlast s);(*At the last char, we abort instead.*)
+  \<ff>s \<leftarrow> compute_\<ff>s_SPEC (butlast s);(*At the last char, we abort instead.*)
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -503,9 +505,9 @@ definition "kmp1 s t \<equiv> do {
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
     if pos=None then do {
-      ASSERT (j < length ls);
-      let i = i + (j - ls!j + 1);
-      let j = max 0 (ls!j - 1); (*max not necessary*)
+      ASSERT (j < length \<ff>s);
+      let i = i + (j - \<ff>s!j + 1);
+      let j = max 0 (\<ff>s!j - 1); (*max not necessary*)
       RETURN (i,j,None)
     } else RETURN (i,j,Some i)
   }) (i,j,pos);
@@ -513,13 +515,13 @@ definition "kmp1 s t \<equiv> do {
   RETURN pos
 }"
 
-lemma iblp1_butlast[simp]: "j < length s \<Longrightarrow> iblp1 (butlast s) j = iblp1 s j"
+lemma \<ff>_butlast[simp]: "j < length s \<Longrightarrow> \<ff> (butlast s) j = \<ff> s j"
   by (cases j) (simp_all add: take_butlast)
 
 lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply (rule refine_IdD)
   unfolding kmp1_def kmp_def
-  unfolding Let_def compute_iblp1s_SPEC_def nres_monad_laws
+  unfolding Let_def compute_\<ff>s_SPEC_def nres_monad_laws
   apply (intro ASSERT_refine_right ASSERT_refine_left)
   apply simp
   apply (rule Refine_Basic.intro_spec_refine)
@@ -528,46 +530,46 @@ lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply vc_solve
   done
 
-text\<open>Next, an algorithm that satisfies @{const compute_iblp1s_SPEC}:\<close>
-subsection\<open>Computing @{const iblp1}\<close>
+text\<open>Next, an algorithm that satisfies @{const compute_\<ff>s_SPEC}:\<close>
+subsection\<open>Computing @{const \<ff>}\<close>
 subsubsection\<open>Invariants\<close>
 
-definition "I_out_cb s \<equiv> \<lambda>(ls,i,j).
-  length s + 1 = length ls \<and>
-  (\<forall>jj<j. ls!jj = iblp1 s jj) \<and>
-  ls!(j-1) = i \<and>
+definition "I_out_cb s \<equiv> \<lambda>(\<ff>s,i,j).
+  length s + 1 = length \<ff>s \<and>
+  (\<forall>jj<j. \<ff>s!jj = \<ff> s jj) \<and>
+  \<ff>s!(j-1) = i \<and>
   0 < j"
 definition "I_in_cb s j \<equiv> \<lambda>i.
   if j=1 then i=0 (* first iteration *)
   else
     strict_border (take (i-1) s) (take (j-1) s) \<and>
-    iblp1 s j \<le> i + 1"
+    \<ff> s j \<le> i + 1"
 
 subsubsection\<open>Algorithm\<close>
 
 text\<open>Again, we follow Seidl@{cite GAD}, p.582. Apart from the +1-shift, we make another modification:
-Instead of directly setting @{term \<open>ls!1\<close>}, we let the first loop-iteration (if there is one) do that for us.
-This allows us to remove the precondition @{prop \<open>s \<noteq> []\<close>}, as the index bounds are respected even in that special case.\<close>
+Instead of directly setting @{term \<open>\<ff>s!1\<close>}, we let the first loop-iteration (if there is one) do that for us.
+This allows us to remove the precondition @{prop \<open>s \<noteq> []\<close>}, as the index bounds are respected even in that corner case.\<close>
 
-definition compute_iblp1s :: "'a list \<Rightarrow> nat list nres" where
-  "compute_iblp1s s = do {
-  let ls=replicate (length s + 1) 0;(*only the first 0 is needed*)
+definition compute_\<ff>s :: "'a list \<Rightarrow> nat list nres" where
+  "compute_\<ff>s s = do {
+  let \<ff>s=replicate (length s + 1) 0;(*only the first 0 is needed*)
   let i=0;
   let j=1;
-  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(ls,i,j). j < length ls) (\<lambda>(ls,i,j). do {
+  (\<ff>s,_,_) \<leftarrow> WHILEIT (I_out_cb s) (\<lambda>(\<ff>s,_,j). j < length \<ff>s) (\<lambda>(\<ff>s,i,j). do {
     i \<leftarrow> WHILEIT (I_in_cb s j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length ls);
-      let i=ls!(i-1);
+      ASSERT (i-1 < length \<ff>s);
+      let i=\<ff>s!(i-1);
       RETURN i
     }) i;
     let i=i+1;
-    ASSERT (j < length ls);
-    let ls=ls[j:=i];
+    ASSERT (j < length \<ff>s);
+    let \<ff>s=\<ff>s[j:=i];
     let j=j+1;
-    RETURN (ls,i,j)
-  }) (ls,i,j);
+    RETURN (\<ff>s,i,j)
+  }) (\<ff>s,i,j);
   
-  RETURN ls
+  RETURN \<ff>s
 }"
 
 subsubsection\<open>Correctness\<close>
@@ -621,52 +623,52 @@ proof -
     by simp
 qed
 
-corollary iblp1_Suc(*rm*): "Suc i \<le> length w \<Longrightarrow> iblp1 w (Suc i) \<le> iblp1 w i + 1"
+corollary \<ff>_Suc(*rm*): "Suc i \<le> length w \<Longrightarrow> \<ff> w (Suc i) \<le> \<ff> w i + 1"
   apply (cases i)
    apply (simp_all add: take_Suc0)
   by (metis One_nat_def Suc_eq_plus1 Suc_to_right butlast_take diff_is_0_eq ib_butlast length_take min.absorb2 nat.simps(3) not_less_eq_eq numerals(2))
 
-lemma iblp1_step_bound(*rm*):
+lemma \<ff>_step_bound(*rm*):
   assumes "j \<le> length w"
-  shows "iblp1 w j \<le> iblp1 w (j-1) + 1"
-  using assms[THEN j_le_iblp1_le] iblp1_Suc assms
-  by (metis One_nat_def Suc_pred iblp1.elims less_Suc_eq_le zero_less_Suc)
+  shows "\<ff> w j \<le> \<ff> w (j-1) + 1"
+  using assms[THEN j_le_\<ff>_le] \<ff>_Suc assms
+  by (metis One_nat_def Suc_pred le_SucI not_gr_zero trans_le_add2)
 
-lemma border_take_iblp1: "border (take (iblp1 s i - 1) s ) (take i s)"
+lemma border_take_\<ff>: "border (take (\<ff> s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
   by (metis "needed?" border_order.eq_iff border_order.less_imp_le border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil take_length_ib zero_less_Suc)
 
-corollary iblp1_strict_borderI: "y = iblp1 s (i - 1) \<Longrightarrow> strict_border (take (i - 1) s) (take (j - 1) s) \<Longrightarrow> strict_border (take (y - 1) s) (take (j - 1) s)"
-  using border_order.less_le_not_le border_order.order.trans border_take_iblp1 by blast
+corollary \<ff>_strict_borderI: "y = \<ff> s (i-1) \<Longrightarrow> strict_border (take (i-1) s) (take (j-1) s) \<Longrightarrow> strict_border (take (y-1) s) (take (j-1) s)"
+  using border_order.less_le_not_le border_order.order.trans border_take_\<ff> by blast
 
-corollary strict_border_take_iblp1: "0 < i \<Longrightarrow> i \<le> length s \<Longrightarrow> strict_border (take (iblp1 s i - 1) s ) (take i s)"
-  by (meson border_order.less_le_not_le border_take_iblp1 border_take_lengths j_le_iblp1_le' leD)
+corollary strict_border_take_\<ff>: "0 < i \<Longrightarrow> i \<le> length s \<Longrightarrow> strict_border (take (\<ff> s i - 1) s ) (take i s)"
+  by (meson border_order.less_le_not_le border_take_\<ff> border_take_lengths j_le_\<ff>_le' leD)
 
-lemma iblp1_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> iblp1 s j \<ge> length b + 1"
-  by (metis (no_types, lifting) Suc_eq_plus1 Suc_le_eq add_le_cancel_right strict_borderE iblp1.elims intrinsic_border_max length_take min.absorb2)
+lemma \<ff>_is_max: "j \<le> length s \<Longrightarrow> strict_border b (take j s) \<Longrightarrow> \<ff> s j \<ge> length b + 1"
+  by (metis \<ff>.elims add_le_cancel_right add_less_same_cancel2 border_length_r_less intrinsic_border_max length_take min_absorb2 not_add_less2)
 
 theorem skipping_ok:
   assumes j_bounds[simp]: "1 < j" "j \<le> length s"
     and mismatch: "s!(i-1) \<noteq> s!(j-1)"
-    and greater_checked: "iblp1 s j \<le> i + 1"
+    and greater_checked: "\<ff> s j \<le> i + 1"
     and "strict_border (take (i-1) s) (take (j-1) s)"
-  shows "iblp1 s j \<le> iblp1 s (i-1) + 1"
+  shows "\<ff> s j \<le> \<ff> s (i-1) + 1"
 proof (rule ccontr)
-  assume "\<not>iblp1 s j \<le> iblp1 s (i-1) + 1"
+  assume "\<not>\<ff> s j \<le> \<ff> s (i-1) + 1"
   then have i_bounds: "0 < i" "i \<le> length s"
     using greater_checked assms(5) take_Nil by fastforce+
   then have i_less_j: "i < j"
     using assms(5) border_length_r_less nz_le_conv_less by auto
-  from \<open>\<not>iblp1 s j \<le> iblp1 s (i-1) + 1\<close> greater_checked consider
-    (tested) "iblp1 s j = i + 1" --\<open>This contradicts @{thm mismatch}\<close> |
-    (skipped) "iblp1 s (i-1) + 1 < iblp1 s j" "iblp1 s j \<le> i"
-      --\<open>This contradicts @{thm iblp1_max[of "i-1" s]}\<close>
+  from \<open>\<not>\<ff> s j \<le> \<ff> s (i-1) + 1\<close> greater_checked consider
+    (tested) "\<ff> s j = i + 1" --\<open>This contradicts @{thm mismatch}\<close> |
+    (skipped) "\<ff> s (i-1) + 1 < \<ff> s j" "\<ff> s j \<le> i"
+      --\<open>This contradicts @{thm \<ff>_is_max[of "i-1" s]}\<close>
     by linarith
   then show False
   proof cases
     case tested
-    then have "iblp1 s j - 1 = i" by simp
-    moreover note border_positions[OF border_take_iblp1[of s j, unfolded this]]
+    then have "\<ff> s j - 1 = i" by simp
+    moreover note border_positions[OF border_take_\<ff>[of s j, unfolded this]]
     ultimately have "take j s ! (i-1) = s!(j-1)" using i_bounds i_less_j by simp
     with \<open>i < j\<close> have "s!(i-1) = s!(j-1)"
       by (simp add: less_imp_diff_less)
@@ -675,26 +677,26 @@ proof (rule ccontr)
     case skipped
     let ?border = "take (i-1) s"
       \<comment>\<open>This border of @{term \<open>take (j-1) s\<close>} could not be extended to a border of @{term \<open>take j s\<close>} due to the mismatch.\<close>
-    let ?impossible = "take (iblp1 s j - 2) s"
+    let ?impossible = "take (\<ff> s j - 2) s"
       \<comment>\<open>A strict border longer than @{term \<open>intrinsic_border ?border\<close>}, a contradiction.\<close>
     have "length (take j s) = j"
       by simp
-    have "iblp1 s j - 2 < i - 1"
+    have "\<ff> s j - 2 < i - 1"
       using skipped by linarith
-    then have less_s: "iblp1 s j - 2 < length s" "i - 1 < length s"
+    then have less_s: "\<ff> s j - 2 < length s" "i - 1 < length s"
       using \<open>i < j\<close> j_bounds(2) by linarith+
     then have strict: "length ?impossible < length ?border"
-      using \<open>iblp1 s j - 2 < i - 1\<close> by auto
+      using \<open>\<ff> s j - 2 < i - 1\<close> by auto
     moreover {
       have "prefix ?impossible (take j s)"
         using prefix_length_prefix take_is_prefix
-        by (metis (no_types, lifting) \<open>length (take j s) = j\<close> j_bounds(2) diff_le_self j_le_iblp1_le length_take less_s(1) min_simps(2) order_trans)
+        by (metis (no_types, lifting) \<open>length (take j s) = j\<close> j_bounds(2) diff_le_self j_le_\<ff>_le length_take less_s(1) min_simps(2) order_trans)
       moreover have "prefix ?border (take j s)"
         by (metis (no_types, lifting) \<open>length (take j s) = j\<close> diff_le_self i_less_j le_trans length_take less_or_eq_imp_le less_s(2) min_simps(2) prefix_length_prefix take_is_prefix)
       ultimately have "prefix ?impossible ?border"
         using strict less_imp_le_nat prefix_length_prefix by blast
     } moreover {
-      have "suffix (take (iblp1 s j - 1) s) (take j s)" using border_take_iblp1
+      have "suffix (take (\<ff> s j - 1) s) (take j s)" using border_take_\<ff>
         by (auto simp: border_def)
       note suffix_butlast[OF this]
       then have "suffix ?impossible (take (j-1) s)"
@@ -706,12 +708,12 @@ proof (rule ccontr)
     }
     ultimately have "strict_border ?impossible ?border"
       unfolding strict_border_def[unfolded border_def] by blast
-    note iblp1_max[of "i-1" s, OF _ this]
-    then have "length (take (iblp1 s j - 2) s) + 1 \<le> iblp1 s (i-1)"
+    note \<ff>_is_max[of "i-1" s, OF _ this]
+    then have "length (take (\<ff> s j - 2) s) + 1 \<le> \<ff> s (i-1)"
       using less_imp_le_nat less_s(2) by blast
-    then have "iblp1 s j - 1 \<le> iblp1 s (i-1)"
+    then have "\<ff> s j - 1 \<le> \<ff> s (i-1)"
       by (simp add: less_s(1))
-    then have "iblp1 s j \<le> iblp1 s (i-1) + 1"
+    then have "\<ff> s j \<le> \<ff> s (i-1) + 1"
       using le_diff_conv by blast
     with skipped(1) show False
       by linarith
@@ -722,8 +724,8 @@ lemma extend_border:
   assumes "j \<le> length s"
   assumes "s!(i-1) = s!(j-1)"
   assumes "strict_border (take (i-1) s) (take (j-1) s)"
-  assumes "iblp1 s j \<le> i + 1"
-  shows "iblp1 s j = i + 1"
+  assumes "\<ff> s j \<le> i + 1"
+  shows "\<ff> s j = i + 1"
 proof -
   from assms(3) have pos_in_range: "i - 1 < length s " "length (take (i-1) s) = i - 1"
     using border_length_r_less min_less_iff_conj by auto
@@ -735,92 +737,92 @@ proof -
     by (simp only: \<open>s!(i-1) = s!(j-1)\<close>)
   then have "strict_border (take i s) (take j s)"
     by (metis One_nat_def Suc_pred assms(1,3) diff_le_self less_le_trans neq0_conv nz_le_conv_less strict_border_imp_nonempty take_Suc_conv_app_nth take_eq_Nil)
-  with iblp1_max[OF assms(1) this] have "iblp1 s j \<ge> i + 1"
+  with \<ff>_is_max[OF assms(1) this] have "\<ff> s j \<ge> i + 1"
     using Suc_leI by fastforce
-  with \<open>iblp1 s j \<le> i + 1\<close> show ?thesis
+  with \<open>\<ff> s j \<le> i + 1\<close> show ?thesis
     using le_antisym by presburger
 qed
 
-lemma compute_iblp1s_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
-  unfolding compute_iblp1s_SPEC_def compute_iblp1s_def I_out_cb_def I_in_cb_def
+lemma compute_\<ff>s_correct: "compute_\<ff>s s \<le> compute_\<ff>s_SPEC s"
+  unfolding compute_\<ff>s_SPEC_def compute_\<ff>s_def I_out_cb_def I_in_cb_def
   apply (simp, refine_vcg
-    WHILEIT_rule[where R="measure (\<lambda>(ls,i,j). length s + 1 - j)"]
+    WHILEIT_rule[where R="measure (\<lambda>(\<ff>s,i,j). length s + 1 - j)"]
     WHILEIT_rule[where R="measure id"] \<comment>\<open>@{term \<open>i::nat\<close>} decreases with every iteration.\<close>
     )
                       apply (vc_solve, fold One_nat_def)
-  subgoal for b j by (rule strict_border_take_iblp1, auto)
-  subgoal by (metis Suc_eq_plus1 iblp1_step_bound less_Suc_eq_le)
+  subgoal for b j by (rule strict_border_take_\<ff>, auto)
+  subgoal by (metis Suc_eq_plus1 \<ff>_step_bound less_Suc_eq_le)
   subgoal by fastforce
   subgoal
-    by (metis (no_types, lifting) One_nat_def Suc_lessD Suc_pred border_length_r_less iblp1_strict_borderI length_take less_Suc_eq less_Suc_eq_le min.absorb2)
+    by (metis (no_types, lifting) One_nat_def Suc_lessD Suc_pred border_length_r_less \<ff>_strict_borderI length_take less_Suc_eq less_Suc_eq_le min.absorb2)
   subgoal for b j i
     by (metis (no_types, lifting) One_nat_def Suc_diff_1 Suc_eq_plus1 Suc_leI border_take_lengths less_Suc_eq_le less_antisym skipping_ok strict_border_def)
-  subgoal by (metis Suc_diff_1 border_take_lengths j_le_iblp1_le less_Suc_eq_le strict_border_def)
+  subgoal by (metis Suc_diff_1 border_take_lengths j_le_\<ff>_le less_Suc_eq_le strict_border_def)
   subgoal for b j i jj
-    by (metis Suc_eq_plus1 Suc_eq_plus1_left add.right_neutral extend_border iblp1_j0 j_le_iblp1_le le_zero_eq less_Suc_eq less_Suc_eq_le nth_list_update_eq nth_list_update_neq)
+    by (metis Suc_eq_plus1 Suc_eq_plus1_left add.right_neutral extend_border \<ff>_eq_0_iff_j_eq_0 j_le_\<ff>_le le_zero_eq less_Suc_eq less_Suc_eq_le nth_list_update_eq nth_list_update_neq)
   subgoal by linarith
   done
 
 subsubsection\<open>Index shift\<close>
-text\<open>To avoid inefficiencies, we refine @{const compute_iblp1s} to take @{term s}
+text\<open>To avoid inefficiencies, we refine @{const compute_\<ff>s} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
-definition compute_iblp1s2 :: "'a list \<Rightarrow> nat list nres" where
-  "compute_iblp1s2 s = do {
-  let ls=replicate (length s) 0;
+definition compute_\<ff>s2 :: "'a list \<Rightarrow> nat list nres" where
+  "compute_\<ff>s2 s = do {
+  let \<ff>s=replicate (length s) 0;
   let i=0;
   let j=1;
-  (ls,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(ls,i,j). do {
-    ASSERT (j < length ls);
+  (\<ff>s,_,_) \<leftarrow> WHILEIT (I_out_cb (butlast s)) (\<lambda>(b,i,j). j < length b) (\<lambda>(\<ff>s,i,j). do {
+    ASSERT (j < length \<ff>s);
     i \<leftarrow> WHILEIT (I_in_cb (butlast s) j) (\<lambda>i. i>0 \<and> s!(i-1) \<noteq> s!(j-1)) (\<lambda>i. do {
-      ASSERT (i-1 < length ls);
-      let i=ls!(i-1);
+      ASSERT (i-1 < length \<ff>s);
+      let i=\<ff>s!(i-1);
       RETURN i
     }) i;
     let i=i+1;
-    ASSERT (j < length ls);
-    let ls=ls[j:=i];
+    ASSERT (j < length \<ff>s);
+    let \<ff>s=\<ff>s[j:=i];
     let j=j+1;
-    RETURN (ls,i,j)
-  }) (ls,i,j);
+    RETURN (\<ff>s,i,j)
+  }) (\<ff>s,i,j);
   
-  RETURN ls
+  RETURN \<ff>s
 }"
 
-lemma compute_iblp1s_inner_bounds: 
-  assumes "I_out_cb s (ls,ix,j)"
-  assumes "j < length ls"
+lemma compute_\<ff>s_inner_bounds: 
+  assumes "I_out_cb s (\<ff>s,ix,j)"
+  assumes "j < length \<ff>s"
   assumes "I_in_cb s j i"
   shows "i-1 < length s" "j-1 < length s"
   using assms
     by (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
 
-lemma compute_iblp1s2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> compute_iblp1s2 s \<le> \<Down>Id (compute_iblp1s s')"
-  unfolding compute_iblp1s2_def compute_iblp1s_def
+lemma compute_\<ff>s2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> compute_\<ff>s2 s \<le> \<Down>Id (compute_\<ff>s s')"
+  unfolding compute_\<ff>s2_def compute_\<ff>s_def
   apply (refine_rcg)
   apply (refine_dref_type)
   apply (vc_solve simp: in_br_conv)
   subgoal by (metis Suc_pred length_greater_0_conv replicate_Suc)
-  subgoal by (metis One_nat_def compute_iblp1s_inner_bounds nth_butlast)
+  subgoal by (metis One_nat_def compute_\<ff>s_inner_bounds nth_butlast)
   done
 
   
-corollary compute_iblp1s2_refine'[refine]: 
+corollary compute_\<ff>s2_refine'[refine]: 
   assumes "(s,s') \<in> br butlast (op \<noteq>[])"
-  shows "compute_iblp1s2 s \<le> \<Down> Id (compute_iblp1s_SPEC s')"
+  shows "compute_\<ff>s2 s \<le> \<Down> Id (compute_\<ff>s_SPEC s')"
 proof -
-  note compute_iblp1s2_ref1
-  also note compute_iblp1s_correct
+  note compute_\<ff>s2_ref1
+  also note compute_\<ff>s_correct
   finally show ?thesis using assms by simp
 qed
   
 subsection\<open>Conflation\<close>
-text\<open>We replace @{const compute_iblp1s_SPEC} with @{const compute_iblp1s}\<close>
+text\<open>We replace @{const compute_\<ff>s_SPEC} with @{const compute_\<ff>s}\<close>
 definition "kmp2 s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
   let j=0;
   let pos=None;
-  ls \<leftarrow> compute_iblp1s2 s;
+  \<ff>s \<leftarrow> compute_\<ff>s2 s;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t \<and> pos=None);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -828,9 +830,9 @@ definition "kmp2 s t \<equiv> do {
       if j=length s then RETURN (j,Some i) else RETURN (j,None)
     }) (j,pos);
     if pos=None then do {
-      ASSERT (j < length ls);
-      let i = i + (j - ls!j + 1);
-      let j = max 0 (ls!j - 1); (*max not necessary*)
+      ASSERT (j < length \<ff>s);
+      let i = i + (j - \<ff>s!j + 1);
+      let j = max 0 (\<ff>s!j - 1); (*max not necessary*)
       RETURN (i,j,None)
     } else RETURN (i,j,Some i)
   }) (i,j,pos);
@@ -838,7 +840,7 @@ definition "kmp2 s t \<equiv> do {
   RETURN pos
 }"
 
-text\<open>Using @{thm [source] compute_iblp1s2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
+text\<open>Using @{thm [source] compute_\<ff>s2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
 lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
@@ -869,10 +871,10 @@ section \<open>Refinement to Imperative/HOL\<close>
 
 lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by simp
 
-lemmas in_bounds_aux = compute_iblp1s_inner_bounds[of "butlast s" for s, simplified]
+lemmas in_bounds_aux = compute_\<ff>s_inner_bounds[of "butlast s" for s, simplified]
 
-sepref_definition compute_iblp1s2_impl is compute_iblp1s2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
-  unfolding compute_iblp1s2_def
+sepref_definition compute_\<ff>s2_impl is compute_\<ff>s2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
+  unfolding compute_\<ff>s2_def
   supply in_bounds_aux[dest]
   supply eq_id_param[where 'a='a, sepref_import_param]
   apply (rewrite array_fold_custom_replicate)
@@ -880,9 +882,9 @@ sepref_definition compute_iblp1s2_impl is compute_iblp1s2 :: "(arl_assn id_assn)
   
   
   
-declare compute_iblp1s2_impl.refine[sepref_fr_rules]
+declare compute_\<ff>s2_impl.refine[sepref_fr_rules]
 
-sepref_register compute_iblp1s
+sepref_register compute_\<ff>s
 
 lemma kmp_inner_in_bound:
   assumes "i + length s \<le> length t"
