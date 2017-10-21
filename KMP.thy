@@ -741,7 +741,7 @@ proof -
     using le_antisym by presburger
 qed
 
-lemma computeBorders_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
+lemma compute_iblp1s_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
   unfolding compute_iblp1s_SPEC_def compute_iblp1s_def I_out_cb_def I_in_cb_def
   apply (simp, refine_vcg
     WHILEIT_rule[where R="measure (\<lambda>(ls,i,j). length s + 1 - j)"]
@@ -764,8 +764,8 @@ lemma computeBorders_correct: "compute_iblp1s s \<le> compute_iblp1s_SPEC s"
 subsubsection\<open>Index shift\<close>
 text\<open>To avoid inefficiencies, we refine @{const compute_iblp1s} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
-definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
-  "computeBorders2 s = do {
+definition compute_iblp1s2 :: "'a list \<Rightarrow> nat list nres" where
+  "compute_iblp1s2 s = do {
   let ls=replicate (length s) 0;
   let i=0;
   let j=1;
@@ -786,7 +786,7 @@ definition computeBorders2 :: "'a list \<Rightarrow> nat list nres" where
   RETURN ls
 }"
 
-lemma computeBorders_inner_bounds: 
+lemma compute_iblp1s_inner_bounds: 
   assumes "I_out_cb s (ls,ix,j)"
   assumes "j < length ls"
   assumes "I_in_cb s j i"
@@ -794,22 +794,22 @@ lemma computeBorders_inner_bounds:
   using assms
     by (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
 
-lemma computeBorders2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> computeBorders2 s \<le> \<Down>Id (compute_iblp1s s')"
-  unfolding computeBorders2_def compute_iblp1s_def
+lemma compute_iblp1s2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> compute_iblp1s2 s \<le> \<Down>Id (compute_iblp1s s')"
+  unfolding compute_iblp1s2_def compute_iblp1s_def
   apply (refine_rcg)
   apply (refine_dref_type)
   apply (vc_solve simp: in_br_conv)
   subgoal by (metis Suc_pred length_greater_0_conv replicate_Suc)
-  subgoal by (metis One_nat_def computeBorders_inner_bounds nth_butlast)
+  subgoal by (metis One_nat_def compute_iblp1s_inner_bounds nth_butlast)
   done
 
   
-corollary computeBorders2_refine'[refine]: 
+corollary compute_iblp1s2_refine'[refine]: 
   assumes "(s,s') \<in> br butlast (op \<noteq>[])"
-  shows "computeBorders2 s \<le> \<Down> Id (compute_iblp1s_SPEC s')"
+  shows "compute_iblp1s2 s \<le> \<Down> Id (compute_iblp1s_SPEC s')"
 proof -
-  note computeBorders2_ref1
-  also note computeBorders_correct
+  note compute_iblp1s2_ref1
+  also note compute_iblp1s_correct
   finally show ?thesis using assms by simp
 qed
   
@@ -820,7 +820,7 @@ definition "kmp2 s t \<equiv> do {
   let i=0;
   let j=0;
   let pos=None;
-  ls \<leftarrow> computeBorders2 s;
+  ls \<leftarrow> compute_iblp1s2 s;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t \<and> pos=None);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -838,7 +838,7 @@ definition "kmp2 s t \<equiv> do {
   RETURN pos
 }"
 
-text\<open>Using @{thm [source] computeBorders2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
+text\<open>Using @{thm [source] compute_iblp1s2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
 lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
@@ -869,10 +869,10 @@ section \<open>Refinement to Imperative/HOL\<close>
 
 lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by simp
 
-lemmas in_bounds_aux = computeBorders_inner_bounds[of "butlast s" for s, simplified]
+lemmas in_bounds_aux = compute_iblp1s_inner_bounds[of "butlast s" for s, simplified]
 
-sepref_definition computeBorders2_impl is computeBorders2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
-  unfolding computeBorders2_def
+sepref_definition compute_iblp1s2_impl is compute_iblp1s2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
+  unfolding compute_iblp1s2_def
   supply in_bounds_aux[dest]
   supply eq_id_param[where 'a='a, sepref_import_param]
   apply (rewrite array_fold_custom_replicate)
@@ -880,7 +880,7 @@ sepref_definition computeBorders2_impl is computeBorders2 :: "(arl_assn id_assn)
   
   
   
-declare computeBorders2_impl.refine[sepref_fr_rules]
+declare compute_iblp1s2_impl.refine[sepref_fr_rules]
 
 sepref_register compute_iblp1s
 
@@ -934,7 +934,7 @@ ML_val \<open>
 ML_val \<open>
   fun str2arl s = (Array.fromList (String.explode s), @{code nat_of_integer} (String.size s))
   fun kmp s t = map_option (@{code integer_of_nat}) (@{code kmp_string_impl} (str2arl s) (str2arl t) ())
-
+  
   (*too fast, no warnings*)
   val test1 = let val (s,t) = ("anas","bananas"); val kmp_res1 = timeap_msg "test1_kmp" (kmp s) t; in
   @{assert} (kmp_res1 = kmp_res1(*replace by ... = timeap_msg "test1_nap" (nap s) t*)); kmp_res1 end;
