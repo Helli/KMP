@@ -182,7 +182,10 @@ lemma "s \<noteq> [] \<Longrightarrow> naive_algorithm s t \<le> kmp_SPEC s t"
 text\<open>Note that the precondition cannot be removed without an extra branch: If @{prop \<open>s = []\<close>}, the inner while-condition accesses out-of-bound memory. This will apply to KMP, too.\<close>
 
 section\<open>Knuth–Morris–Pratt algorithm\<close>
-subsection\<open>Borders of lists\<close>
+
+text\<open>Just like our templates@{cite KMP77}@{cite GAD}, we first verify the main routine and discuss the computation of the auxiliary values @{term \<open>\<ff> s\<close>} only in a later section.\<close>
+
+subsection\<open>Preliminaries: Borders of lists\<close>
 
 definition "border xs ys \<longleftrightarrow> prefix xs ys \<and> suffix xs ys"
 definition "strict_border xs ys \<longleftrightarrow> border xs ys \<and> length xs < length ys"
@@ -800,7 +803,7 @@ lemma compute_butlast_\<ff>s_refine[refine]:
   assumes "(s,s') \<in> br butlast (op\<noteq> [])"
   shows "compute_butlast_\<ff>s s \<le> \<Down> Id (compute_\<ff>s_SPEC s')"
 proof -
-  have "compute_butlast_\<ff>s s \<le> \<Down>Id (compute_\<ff>s s')"
+  have "compute_butlast_\<ff>s s \<le> \<Down> Id (compute_\<ff>s s')"
     unfolding compute_butlast_\<ff>s_def compute_\<ff>s_def 
     apply (refine_rcg)
               apply (refine_dref_type)
