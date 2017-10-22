@@ -766,8 +766,8 @@ lemma compute_\<ff>s_correct: "compute_\<ff>s s \<le> compute_\<ff>s_SPEC s"
 subsubsection\<open>Index shift\<close>
 text\<open>To avoid inefficiencies, we refine @{const compute_\<ff>s} to take @{term s}
 instead of @{term \<open>butlast s\<close>} (it still only uses @{term \<open>butlast s\<close>}).\<close>
-definition compute_\<ff>s2 :: "'a list \<Rightarrow> nat list nres" where
-  "compute_\<ff>s2 s = do {
+definition compute_butlast_\<ff>s :: "'a list \<Rightarrow> nat list nres" where
+  "compute_butlast_\<ff>s s = do {
   let \<ff>s=replicate (length s) 0;
   let i=0;
   let j=1;
@@ -796,33 +796,29 @@ lemma compute_\<ff>s_inner_bounds:
   using assms
     by (auto simp: I_out_cb_def I_in_cb_def split: if_splits)
 
-lemma compute_\<ff>s2_ref1: "(s,s') \<in> br butlast (op \<noteq>[]) \<Longrightarrow> compute_\<ff>s2 s \<le> \<Down>Id (compute_\<ff>s s')"
-  unfolding compute_\<ff>s2_def compute_\<ff>s_def
-  apply (refine_rcg)
-  apply (refine_dref_type)
-  apply (vc_solve simp: in_br_conv)
-  subgoal by (metis Suc_pred length_greater_0_conv replicate_Suc)
-  subgoal by (metis One_nat_def compute_\<ff>s_inner_bounds nth_butlast)
-  done
-
-  
-corollary compute_\<ff>s2_refine'[refine]: 
-  assumes "(s,s') \<in> br butlast (op \<noteq>[])"
-  shows "compute_\<ff>s2 s \<le> \<Down> Id (compute_\<ff>s_SPEC s')"
+lemma compute_butlast_\<ff>s_refine[refine]:
+  assumes "(s,s') \<in> br butlast (op\<noteq> [])"
+  shows "compute_butlast_\<ff>s s \<le> \<Down> Id (compute_\<ff>s_SPEC s')"
 proof -
-  note compute_\<ff>s2_ref1
+  have "compute_butlast_\<ff>s s \<le> \<Down>Id (compute_\<ff>s s')"
+    unfolding compute_butlast_\<ff>s_def compute_\<ff>s_def 
+    apply (refine_rcg)
+              apply (refine_dref_type)
+    using assms apply (vc_solve simp: in_br_conv)
+     apply (metis Suc_pred length_greater_0_conv replicate_Suc)
+    by (metis One_nat_def compute_\<ff>s_inner_bounds nth_butlast)
   also note compute_\<ff>s_correct
-  finally show ?thesis using assms by simp
+  finally show ?thesis by simp
 qed
-  
+
 subsection\<open>Conflation\<close>
-text\<open>We replace @{const compute_\<ff>s_SPEC} with @{const compute_\<ff>s}\<close>
+text\<open>We replace @{const compute_\<ff>s_SPEC} with @{const compute_butlast_\<ff>s}\<close>
 definition "kmp2 s t \<equiv> do {
   ASSERT (s \<noteq> []);
   let i=0;
   let j=0;
   let pos=None;
-  \<ff>s \<leftarrow> compute_\<ff>s2 s;
+  \<ff>s \<leftarrow> compute_butlast_\<ff>s s;
   (_,_,pos) \<leftarrow> WHILEIT (I_outer s t) (\<lambda>(i,j,pos). i + length s \<le> length t \<and> pos=None) (\<lambda>(i,j,pos). do {
     ASSERT (i + length s \<le> length t \<and> pos=None);
     (j,pos) \<leftarrow> WHILEIT (I_in_na s t i) (\<lambda>(j,pos). t!(i+j) = s!j \<and> pos=None) (\<lambda>(j,pos). do {
@@ -840,7 +836,7 @@ definition "kmp2 s t \<equiv> do {
   RETURN pos
 }"
 
-text\<open>Using @{thm [source] compute_\<ff>s2_refine'} (it has attribute @{attribute refine}), the proof is trivial:\<close>
+text\<open>Using @{thm [source] compute_butlast_\<ff>s_refine} (it has attribute @{attribute refine}), the proof is trivial:\<close>
 lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
@@ -873,8 +869,8 @@ lemma eq_id_param: "(op =, op =) \<in> Id \<rightarrow> Id \<rightarrow> Id" by 
 
 lemmas in_bounds_aux = compute_\<ff>s_inner_bounds[of "butlast s" for s, simplified]
 
-sepref_definition compute_\<ff>s2_impl is compute_\<ff>s2 :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
-  unfolding compute_\<ff>s2_def
+sepref_definition compute_butlast_\<ff>s_impl is compute_butlast_\<ff>s :: "(arl_assn id_assn)\<^sup>k \<rightarrow>\<^sub>a array_assn nat_assn"
+  unfolding compute_butlast_\<ff>s_def
   supply in_bounds_aux[dest]
   supply eq_id_param[where 'a='a, sepref_import_param]
   apply (rewrite array_fold_custom_replicate)
@@ -882,7 +878,7 @@ sepref_definition compute_\<ff>s2_impl is compute_\<ff>s2 :: "(arl_assn id_assn)
   
   
   
-declare compute_\<ff>s2_impl.refine[sepref_fr_rules]
+declare compute_butlast_\<ff>s_impl.refine[sepref_fr_rules]
 
 sepref_register compute_\<ff>s
 
