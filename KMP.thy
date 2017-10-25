@@ -251,14 +251,6 @@ lemma positions_border: "\<forall>j<l. w!j = w!(length w - l + j) \<Longrightarr
 lemma positions_strict_border: "l < length w \<Longrightarrow> \<forall>j<l. w!j = w!(length w - l + j) \<Longrightarrow> strict_border (take l w) w"
   by (simp add: positions_border strict_border_def)
 
-lemma "needed?": "w \<noteq> [] \<Longrightarrow> strict_border (intrinsic_border w) w"
-  (*equivalent to intrinsic_borderI'*)
-  unfolding intrinsic_border_def
-  thm arg_max_natI[of _ "[]"]
-  apply (rule arg_max_natI[of _ "[]"])
-   apply (simp add: border_bot.bot.not_eq_extremum)
-  using strict_borderE by auto
-
 lemmas intrinsic_borderI = arg_max_natI[OF _ border_length_r_less, folded intrinsic_border_def]
 
 lemmas intrinsic_borderI' = border_bot.bot.not_eq_extremum[THEN iffD1, THEN intrinsic_borderI]
@@ -269,7 +261,7 @@ lemma nonempty_is_arg_max_ib: "ys \<noteq> [] \<Longrightarrow> is_arg_max lengt
   by (simp add: intrinsic_borderI' intrinsic_border_max is_arg_max_linorder)
 
 lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border w) < length w"
-  using intrinsic_borderI[of w] border_length_r_less "needed?" by blast
+  using intrinsic_borderI[of w] border_length_r_less intrinsic_borderI' by blast
 
 lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
   by (metis intrinsic_border_less length_take less_not_refl2 min_less_iff_conj take_eq_Nil)
@@ -398,7 +390,7 @@ proof (cases "j>0")
   have [simp]: "length (take j s) = j" "length (intrinsic_border (take j s)) = ?j'"
     by (simp add: j_le) (metis \<open>0 < j\<close> diff_add_inverse2 \<ff>.elims nat_neq_iff)
   then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - (\<ff> s j - 1) + jj)"
-    by (metis "needed?" \<open>0 < j\<close> border_positions length_greater_0_conv strict_border_def)
+    by (metis intrinsic_borderI' \<open>0 < j\<close> border_positions length_greater_0_conv strict_border_def)
   then have "\<forall>jj<?j'. take j s ! jj = take j s ! (j - \<ff> s j + 1 + jj)"
     by (simp add: \<ff>_le)
   then have 2: "\<forall>jj<?j'. s ! (j - \<ff> s j + 1 + jj) = s ! jj"
@@ -581,7 +573,7 @@ lemma take_length_ib[simp]:
     shows "take (length (intrinsic_border (take j s))) s = intrinsic_border (take j s)"
 proof -
   from assms have "prefix (intrinsic_border (take j s)) (take j s)"
-    by (metis "needed?" border_def list.size(3) neq0_conv not_less strict_border_def take_eq_Nil)
+    by (metis intrinsic_borderI' border_def list.size(3) neq0_conv not_less strict_border_def take_eq_Nil)
   also have "prefix (take j s) s"
     by (simp add: \<open>j \<le> length s\<close> take_is_prefix)
   finally show ?thesis
@@ -639,7 +631,7 @@ lemma \<ff>_step_bound(*rm*):
 
 lemma border_take_\<ff>: "border (take (\<ff> s i - 1) s ) (take i s)"
   apply (cases i, simp_all)
-  by (metis "needed?" border_order.eq_iff border_order.less_imp_le border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil take_length_ib zero_less_Suc)
+  by (metis intrinsic_borderI' border_order.eq_iff border_order.less_imp_le border_positions nat.simps(3) nat_le_linear positions_border take_all take_eq_Nil take_length_ib zero_less_Suc)
 
 corollary \<ff>_strict_borderI: "y = \<ff> s (i-1) \<Longrightarrow> strict_border (take (i-1) s) (take (j-1) s) \<Longrightarrow> strict_border (take (y-1) s) (take (j-1) s)"
   using border_order.less_le_not_le border_order.order.trans border_take_\<ff> by blast
