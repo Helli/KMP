@@ -41,10 +41,16 @@
 \maketitle
 
 \begin{abstract}
-The Knuth-Morris-Pratt algorithm\cite{KMP77} is often used to show that the problem of finding a string $s$ in a text $t$ can be solved deterministically in $O(|s| + |t|)$ time. We use Lammich's \textit{Refine} monad\cite{Refine_Monadic-AFP} to formulate and verify the algorithm. Via refinement, we apply some optimisations and, using the \textit{Imperative Refinement Framework}\cite{Refine_Imperative_HOL-AFP}, obtain executable code in \textit{Imperative/HOL}.
+The Knuth-Morris-Pratt algorithm\cite{KMP77} is often used to show that the problem of finding 
+a string $s$ in a text $t$ can be solved deterministically in $O(|s| + |t|)$ time. 
+We use the Isabelle Refinement Framework\cite{Refine_Monadic-AFP} to formulate and verify 
+the algorithm. Via refinement, we apply some optimisations and and finally
+use the \textit{Sepref} tool\cite{Refine_Imperative_HOL-AFP} to obtain executable 
+code in \textit{Imperative/HOL}.
 \end{abstract}
 
 \tableofcontents
+\clearpage
 
 % sane default for proof documents
 \parindent 0pt\parskip 0.5ex

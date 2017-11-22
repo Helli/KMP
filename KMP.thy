@@ -1,16 +1,13 @@
-
 theory KMP
   imports Refine_Imperative_HOL.IICF
     "HOL-Library.Sublist"
     "HOL-Library.Code_Char"
 begin
 
-text\<open>Test. @{cite "Refine_Imperative_HOL-AFP"} Working? Test 2 @{cite KMP77} @{cite GAD}\<close>
-
 declare len_greater_imp_nonempty[simp del] min_absorb2[simp]
 no_notation Ref.update ("_ := _" 62)
 
-section\<open>Specification\<close>
+section\<open>Specification\<close>text_raw\<open>\label{sec:spec}\<close>
 
 subsection\<open>Sublist-predicate with a position check\<close>
 
@@ -98,7 +95,10 @@ corollary sublist_iff_sublist_at: "Sublist.sublist xs ys \<longleftrightarrow> (
 
 subsection\<open>Sublist-check algorithms\<close>
 
-text\<open>We use Lammich's @{theory Refine_Monadic} for the specification, as well as the algorithm later.\<close>
+text\<open>
+  We use the Isabelle Refinement Framework (Theory @{theory Refine_Monadic}) to
+  phrase the specification and the algorithm. 
+\<close>
 text\<open>@{term s} for "searchword" / "searchlist", @{term t} for "text"\<close>
 definition "kmp_SPEC s t = SPEC (\<lambda>
   None \<Rightarrow> \<nexists>i. sublist_at s t i |
@@ -905,6 +905,13 @@ lemma kmp3_correct':
 
 lemmas kmp_impl_correct' = kmp_impl.refine[FCOMP kmp3_correct']
 
+subsection \<open>Overall Correctness Theorem\<close>
+text \<open>The following theorem relates the final Imperative HOL algorithm to its specification,
+  using, beyond basic HOL concepts
+    \<^item> Hoare triples for Imperative/HOL, provided by the Separation Logic Framework for Imperative/HOL (Theory @{theory Sep_Main});
+    \<^item> The assertion @{const arl_assn} to specify array-lists, which we use to represent the input strings of the algorithm;
+    \<^item> The @{const sublist_at} function that we defined in Section \ref{sec:spec}.
+  \<close>
 theorem kmp3_impl_correct:
   "< arl_assn id_assn s si * arl_assn id_assn t ti > 
        kmp_impl si ti 
@@ -919,10 +926,7 @@ theorem kmp3_impl_correct:
 
 definition "kmp_string_impl \<equiv> kmp_impl :: (char array \<times> nat) \<Rightarrow> _"
 
-ML_val \<open>
-  open File
-
-\<close>
+section \<open>Tests of Generated ML-Code\<close>
 
 ML_val \<open>
   fun str2arl s = (Array.fromList (String.explode s), @{code nat_of_integer} (String.size s))
