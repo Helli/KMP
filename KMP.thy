@@ -45,7 +45,7 @@ text\<open>Furthermore, we need:\<close>
 lemma sublist_step[intro]:
   "\<lbrakk>i + length xs < length ys; sublist_at xs ys i; ys!(i + length xs) = x\<rbrakk> \<Longrightarrow> sublist_at (xs@[x]) ys i"
   apply (induction xs ys i rule: sublist_at.induct)
-  apply auto
+      apply auto
   using sublist_at.elims(3) by fastforce
 
 lemma all_positions_sublist:
@@ -172,7 +172,7 @@ lemma "s \<noteq> [] \<Longrightarrow> naive_algorithm s t \<le> kmp_SPEC s t"
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
     )
-  apply (vc_solve solve: asm_rl)
+                 apply (vc_solve solve: asm_rl)
   subgoal by (metis add_Suc_right all_positions_sublist less_antisym)
   subgoal using less_Suc_eq by blast
   subgoal by (metis less_SucE sublist_all_positions)
@@ -231,7 +231,6 @@ lemma border_positions: "border xs ys \<Longrightarrow> \<forall>i<length xs. ys
   unfolding border_def
   by (metis diff_add_inverse diff_add_inverse2 length_append not_add_less1 nth_append prefixE suffixE)
 
-(*Todo: swap names, add i+\<dots>, decide whether w instead of x and w is enough*)
 lemma all_positions_drop_length_take: "\<lbrakk>i \<le> length w; i \<le> length x;
   \<forall>j<i. x ! j = w ! (length w + j - i)\<rbrakk>
     \<Longrightarrow> drop (length w - i) w = take i x"
@@ -263,7 +262,7 @@ lemma nonempty_is_arg_max_ib: "ys \<noteq> [] \<Longrightarrow> is_arg_max lengt
 lemma intrinsic_border_less: "w \<noteq> [] \<Longrightarrow> length (intrinsic_border w) < length w"
   using intrinsic_borderI[of w] border_length_r_less intrinsic_borderI' by blast
 
-lemma intrinsic_border_less': "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
+lemma intrinsic_border_take_less: "j > 0 \<Longrightarrow> w \<noteq> [] \<Longrightarrow> length (intrinsic_border (take j w)) < length w"
   by (metis intrinsic_border_less length_take less_not_refl2 min_less_iff_conj take_eq_Nil)
 
 subsubsection\<open>Examples\<close>
@@ -294,7 +293,7 @@ qed
 
 corollary "intrinsic_border ''aabaabaa'' = ''aabaa''"
 proof - \<comment>\<open>We later obtain a fast algorithm for that.\<close>
-  have exhaust: "strict_border b ''aabaabaa'' \<longleftrightarrow> b \<in> {[], ''a'', ''aa'', ''aabaa''}" for b
+  have exhaust: "strict_border b ''aabaabaa'' \<longleftrightarrow> b \<in> {'''', ''a'', ''aa'', ''aabaa''}" for b
     using strict_border_example by auto
   then have
     "\<not>is_arg_max length (\<lambda>b. strict_border b ''aabaabaa'') ''''"
@@ -316,7 +315,6 @@ or equivalently, "f" from Knuth's, Morris' and Pratt's paper@{cite KMP77} (with 
 fun \<ff> :: "'a list \<Rightarrow> nat \<Rightarrow> nat" where
   "\<ff> s 0 = 0" \<comment>\<open>This increments the compare position while @{prop \<open>j=(0::nat)\<close>}\<close> |
   "\<ff> s j = length (intrinsic_border (take j s)) + 1"
-  --\<open>Todo: Use @{command abbreviation} and @{const If}?\<close>
 text\<open>Note that we use their "next" only implicitly.\<close>
 
 subsubsection\<open>Invariants\<close>
@@ -363,7 +361,7 @@ lemma j_le_\<ff>_le': "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow
   by (metis diff_less j_le_\<ff>_le le_eq_less_or_eq less_imp_diff_less less_one)
 
 lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> \<ff> s j - 1 < length s"
-  by (cases j) (simp_all add: intrinsic_border_less')
+  by (cases j) (simp_all add: intrinsic_border_take_less)
 
 lemma "p576 et seq":
   assumes
@@ -910,7 +908,7 @@ text \<open>The following theorem relates the final Imperative HOL algorithm to 
   using, beyond basic HOL concepts
     \<^item> Hoare triples for Imperative/HOL, provided by the Separation Logic Framework for Imperative/HOL (Theory @{theory Sep_Main});
     \<^item> The assertion @{const arl_assn} to specify array-lists, which we use to represent the input strings of the algorithm;
-    \<^item> The @{const sublist_at} function that we defined in Section \ref{sec:spec}.
+    \<^item> The @{const sublist_at} function that we defined in section \ref{sec:spec}.
   \<close>
 theorem kmp3_impl_correct:
   "< arl_assn id_assn s si * arl_assn id_assn t ti > 
