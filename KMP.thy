@@ -360,9 +360,11 @@ lemma j_le_\<ff>_le: "j \<le> length s \<Longrightarrow> \<ff> s j \<le> j"
 lemma j_le_\<ff>_le': "0 < j \<Longrightarrow> j \<le> length s \<Longrightarrow> \<ff> s j - 1 < j"
   by (metis diff_less j_le_\<ff>_le le_eq_less_or_eq less_imp_diff_less less_one)
 
-lemma intrinsic_border_less'': "s \<noteq> [] \<Longrightarrow> \<ff> s j - 1 < length s"
+lemma \<ff>_le: "s \<noteq> [] \<Longrightarrow> \<ff> s j - 1 < length s"
   by (cases j) (simp_all add: intrinsic_border_take_less)
 
+(*
+  Only needed for run-time analysis
 lemma "p576 et seq":
   assumes
     "j \<le> length s" and
@@ -370,9 +372,10 @@ lemma "p576 et seq":
     "i' = i + (j + 1 - \<ff> s j)"
     "j' = max 0 (\<ff> s j - 1)"
   shows
-    sum_no_decrease: "i' + j' \<ge> i + j" (*Todo: When needed?*) and
+    sum_no_decrease: "i' + j' \<ge> i + j" and
     i_increase: "i' > i"
   using assignments by (simp_all add: j_le_\<ff>_le[OF assms(1), THEN le_imp_less_Suc])
+*)
 
 lemma reuse_matches: 
   assumes j_le: "j \<le> length s"
@@ -472,11 +475,11 @@ lemma kmp_correct: "s \<noteq> []
     WHILEIT_rule[where R="measure (\<lambda>(i,_,pos). length t - i + (if pos = None then 1 else 0))"]
     WHILEIT_rule[where R="measure (\<lambda>(j,_::nat option). length s - j)"]
     )
-  apply (vc_solve solve: asm_rl)
+                   apply (vc_solve solve: asm_rl)
   subgoal by (metis add_Suc_right all_positions_sublist less_antisym)
   subgoal using less_antisym by blast
   subgoal for i jout j using shift_safe[of i s t j] by fastforce
-  subgoal for i jout j using reuse_matches[of j s t i] intrinsic_border_less'' by simp
+  subgoal for i jout j using reuse_matches[of j s t i] \<ff>_le by simp
   subgoal by (auto split: option.splits) (metis sublist_lengths add_less_cancel_right leI le_less_trans)
   done
 
@@ -513,14 +516,13 @@ lemma \<ff>_butlast[simp]: "j < length s \<Longrightarrow> \<ff> (butlast s) j =
 
 lemma kmp1_refine: "kmp1 s t \<le> kmp s t"
   apply (rule refine_IdD)
-  unfolding kmp1_def kmp_def
-  unfolding Let_def compute_\<ff>s_SPEC_def nres_monad_laws
+  unfolding kmp1_def kmp_def Let_def compute_\<ff>s_SPEC_def nres_monad_laws
   apply (intro ASSERT_refine_right ASSERT_refine_left)
-  apply simp
+   apply simp
   apply (rule Refine_Basic.intro_spec_refine)
   apply refine_rcg
-  apply refine_dref_type
-  apply vc_solve
+                apply refine_dref_type
+                apply vc_solve
   done
 
 text\<open>Next, an algorithm that satisfies @{const compute_\<ff>s_SPEC}:\<close>
@@ -600,7 +602,7 @@ lemma border_step: "border xs ys \<longleftrightarrow> border (xs@[ys!length xs]
   done
 
 corollary strict_border_step: "strict_border xs ys \<longleftrightarrow> strict_border (xs@[ys!length xs]) (ys@[ys!length xs])"
-  unfolding strict_border_def using border_step by auto(*or use proof above*)
+  unfolding strict_border_def using border_step by auto
 
 lemma ib_butlast: "length w \<ge> 2 \<Longrightarrow> length (intrinsic_border w) \<le> length (intrinsic_border (butlast w)) + 1"
 proof -
@@ -693,7 +695,7 @@ proof (rule ccontr)
         by (auto simp: border_def)
       note suffix_butlast[OF this]
       then have "suffix ?impossible (take (j-1) s)"
-        by (metis One_nat_def j_bounds(2) butlast_take diff_diff_left intrinsic_border_less'' len_greater_imp_nonempty less_or_eq_imp_le less_s(2) one_add_one)
+        by (metis One_nat_def j_bounds(2) butlast_take diff_diff_left \<ff>_le len_greater_imp_nonempty less_or_eq_imp_le less_s(2) one_add_one)
       then have "suffix ?impossible (take (j-1) s)" "suffix ?border (take (j-1) s)"
         using assms(5) by auto
       from suffix_length_suffix[OF this strict[THEN less_imp_le]]
@@ -834,8 +836,8 @@ lemma kmp2_refine: "kmp2 s t \<le> kmp1 s t"
   apply (rule refine_IdD)
   unfolding kmp2_def kmp1_def
   apply refine_rcg
-  apply refine_dref_type
-  apply (vc_solve simp: in_br_conv)
+                  apply refine_dref_type
+                  apply (vc_solve simp: in_br_conv)
   done
 
 lemma kmp2_correct: "s \<noteq> []
@@ -870,7 +872,6 @@ sepref_definition compute_butlast_\<ff>s_impl is compute_butlast_\<ff>s :: "(arl
   by sepref
   
   
-  
 declare compute_butlast_\<ff>s_impl.refine[sepref_fr_rules]
 
 sepref_register compute_\<ff>s
@@ -892,7 +893,6 @@ sepref_definition kmp_impl is "uncurry kmp3" :: "(arl_assn id_assn)\<^sup>k *\<^
   supply eq_id_param[where 'a='a, sepref_import_param]
   by sepref
 
-
 export_code kmp_impl in SML_imp module_name KMP
 
 lemma kmp3_correct':
@@ -910,7 +910,7 @@ text \<open>The following theorem relates the final Imperative HOL algorithm to 
     \<^item> The assertion @{const arl_assn} to specify array-lists, which we use to represent the input strings of the algorithm;
     \<^item> The @{const sublist_at} function that we defined in section \ref{sec:spec}.
   \<close>
-theorem kmp3_impl_correct:
+theorem kmp_impl_correct:
   "< arl_assn id_assn s si * arl_assn id_assn t ti > 
        kmp_impl si ti 
    <\<lambda>r. arl_assn id_assn s si * arl_assn id_assn t ti * \<up>(
@@ -958,7 +958,5 @@ ML_val \<open>
   (*todo: example where the alphabet is infinite or where equality takes long*)
 
 \<close>
-
-unused_thms
 
 end
